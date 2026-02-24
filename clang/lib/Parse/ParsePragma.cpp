@@ -17,6 +17,7 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/Token.h"
 #include "clang/Parse/LoopHint.h"
+#include "clang/Parse/Loopbound.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Parse/RAIIObjectsForParser.h"
 #include "clang/Sema/EnterExpressionEvaluationContext.h"
@@ -296,6 +297,12 @@ struct PragmaUnrollHintHandler : public PragmaHandler {
                     Token &FirstToken) override;
 };
 
+struct PragmaLoopboundHandler : public PragmaHandler {
+  PragmaLoopboundHandler() : PragmaHandler("loopbound") {}
+  void HandlePragma(Preprocessor &PP, PragmaIntroducer Introducer,
+                    Token &FirstToken) override;
+};
+
 struct PragmaMSRuntimeChecksHandler : public EmptyPragmaHandler {
   PragmaMSRuntimeChecksHandler() : EmptyPragmaHandler("runtime_checks") {}
 };
@@ -529,6 +536,9 @@ void Parser::initializePragmaHandlers() {
   LoopHintHandler = std::make_unique<PragmaLoopHintHandler>();
   PP.AddPragmaHandler("clang", LoopHintHandler.get());
 
+  LoopboundHandler = std::make_unique<PragmaLoopboundHandler>();
+  PP.AddPragmaHandler(LoopboundHandler.get());
+
   UnrollHintHandler = std::make_unique<PragmaUnrollHintHandler>("unroll");
   PP.AddPragmaHandler(UnrollHintHandler.get());
   PP.AddPragmaHandler("GCC", UnrollHintHandler.get());
@@ -665,6 +675,9 @@ void Parser::resetPragmaHandlers() {
 
   PP.RemovePragmaHandler("clang", LoopHintHandler.get());
   LoopHintHandler.reset();
+
+  PP.RemovePragmaHandler(LoopboundHandler.get());
+  LoopboundHandler.reset();
 
   PP.RemovePragmaHandler(UnrollHintHandler.get());
   PP.RemovePragmaHandler("GCC", UnrollHintHandler.get());
@@ -1593,6 +1606,35 @@ bool Parser::HandlePragmaLoopHint(LoopHint &Hint) {
   Hint.Range = SourceRange(Info->PragmaName.getLocation(),
                            Info->Toks.back().getLocation());
   return true;
+}
+
+struct PragmaLoopboundInfo {
+  Token PragmaName;
+  Token Min;
+  Token Max;
+};
+
+void Parser::HandlePragmaLoopbound(Loopbound &LB) {
+  assert(Tok.is(tok::annot_pragma_loopbound));
+
+  PragmaLoopboundInfo *Info =
+      static_cast<PragmaLoopboundInfo *>(Tok.getAnnotationValue());
+  ConsumeAnnotationToken();
+
+  LB.PragmaNameLoc = IdentifierLoc::create(
+      Actions.Context,
+      Info->PragmaName.getLocation(),
+      Info->PragmaName.getIdentifierInfo()
+      );
+
+  assert(Info->Min.is(tok::numeric_constant));
+  LB.MinExpr = Actions.ActOnNumericConstant(Info->Min).get();
+
+  assert(Info->Max.is(tok::numeric_constant));
+  LB.MaxExpr = Actions.ActOnNumericConstant(Info->Max).get();
+
+  LB.Range =
+        SourceRange(Info->PragmaName.getLocation(), Info->Max.getLocation());
 }
 
 namespace {
@@ -3756,6 +3798,114 @@ void PragmaUnrollHintHandler::HandlePragma(Preprocessor &PP,
   TokenArray[0].setAnnotationValue(static_cast<void *>(Info));
   PP.EnterTokenStream(std::move(TokenArray), 1,
                       /*DisableMacroExpansion=*/false, /*IsReinject=*/false);
+}
+
+// #pragma loopbound min NUM max NUM
+void PragmaLoopboundHandler::HandlePragma(Preprocessor &PP,
+                                          PragmaIntroducer Introducer,
+                                          Token &Tok) {
+  Token LoopboundTok = Tok;
+
+  PragmaLoopboundInfo *Info =
+    new (PP.getPreprocessorAllocator()) PragmaLoopboundInfo;
+  Info->PragmaName = LoopboundTok;
+
+  PP.LexUnexpandedToken(Tok);
+  if (Tok.isNot(tok::identifier) ||
+      !Tok.getIdentifierInfo()->isStr("min")) {
+    PP.Diag(Tok.getLocation(), diag::err_pragma_loopbound_malformed);
+    return;
+  }
+
+  PP.Lex(Tok); // allow macro expansion for minimum
+  if (!Tok.is(tok::numeric_constant)) {
+    PP.Diag(Tok.getLocation(), diag::err_pragma_loopbound_malformed);
+    return;
+  }
+  // store loopbound min
+  Info->Min = Tok;
+
+  PP.LexUnexpandedToken(Tok);
+  if (Tok.isNot(tok::identifier) ||
+      !Tok.getIdentifierInfo()->isStr("max")) {
+    PP.Diag(Tok.getLocation(), diag::err_pragma_loopbound_malformed);
+    return;
+  }
+
+  PP.Lex(Tok); // allow macro expansion for maximum
+  if (!Tok.is(tok::numeric_constant)) {
+    PP.Diag(Tok.getLocation(), diag::err_pragma_loopbound_malformed);
+    return;
+  }
+  // store loopbound max
+  Info->Max = Tok;
+
+  // eat the max
+  PP.Lex(Tok);
+  if (Tok.isNot(tok::eod)) {
+    PP.Diag(Tok.getLocation(), diag::err_pragma_loopbound_malformed);
+    return;
+  }
+
+  auto TokenArray = std::make_unique<Token[]>(1);
+  TokenArray[0].startToken();
+  TokenArray[0].setKind(tok::annot_pragma_loopbound);
+  TokenArray[0].setLocation(Introducer.Loc);
+  TokenArray[0].setAnnotationEndLoc(LoopboundTok.getLocation());
+  TokenArray[0].setAnnotationValue(static_cast<void *>(Info));
+  PP.EnterTokenStream(std::move(TokenArray), 1, /*DisableMacroExpansion=*/false,
+                      /*IsReinject=*/false);
+
+}
+
+/// Handle the Microsoft \#pragma intrinsic extension.
+///
+/// The syntax is:
+/// \code
+///  #pragma intrinsic(memset)
+///  #pragma intrinsic(strlen, memcpy)
+/// \endcode
+///
+/// Pragma intrisic tells the compiler to use a builtin version of the
+/// function. Clang does it anyway, so the pragma doesn't really do anything.
+/// Anyway, we emit a warning if the function specified in \#pragma intrinsic
+/// isn't an intrinsic in clang and suggest to include intrin.h.
+void PragmaMSIntrinsicHandler::HandlePragma(Preprocessor &PP,
+                                            PragmaIntroducer Introducer,
+                                            Token &Tok) {
+  PP.Lex(Tok);
+
+  if (Tok.isNot(tok::l_paren)) {
+    PP.Diag(Tok.getLocation(), diag::warn_pragma_expected_lparen)
+        << "intrinsic";
+    return;
+  }
+  PP.Lex(Tok);
+
+  bool SuggestIntrinH = !PP.isMacroDefined("__INTRIN_H");
+
+  while (Tok.is(tok::identifier)) {
+    IdentifierInfo *II = Tok.getIdentifierInfo();
+    if (!II->getBuiltinID())
+      PP.Diag(Tok.getLocation(), diag::warn_pragma_intrinsic_builtin)
+          << II << SuggestIntrinH;
+
+    PP.Lex(Tok);
+    if (Tok.isNot(tok::comma))
+      break;
+    PP.Lex(Tok);
+  }
+
+  if (Tok.isNot(tok::r_paren)) {
+    PP.Diag(Tok.getLocation(), diag::warn_pragma_expected_rparen)
+        << "intrinsic";
+    return;
+  }
+  PP.Lex(Tok);
+
+  if (Tok.isNot(tok::eod))
+    PP.Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol)
+        << "intrinsic";
 }
 
 bool Parser::HandlePragmaMSFunction(StringRef PragmaName,

@@ -188,6 +188,50 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
   return LoopHintAttr::CreateImplicit(S.Context, Option, State, ValueExpr, A);
 }
 
+static Attr *handleLoopboundAttr(Sema &S, Stmt *St, const ParsedAttr &A,
+                                 SourceRange Range) {
+  Expr *MinExpr = A.getArgAsExpr(0);
+  Expr *MaxExpr = A.getArgAsExpr(1);
+
+  if (St->getStmtClass() != Stmt::DoStmtClass &&
+      St->getStmtClass() != Stmt::ForStmtClass &&
+      St->getStmtClass() != Stmt::CXXForRangeStmtClass &&
+      St->getStmtClass() != Stmt::WhileStmtClass) {
+    S.Diag(St->getBeginLoc(), diag::err_pragma_loop_precedes_nonloop)
+       << "#pragma loopbound";
+    return nullptr;
+  }
+
+  auto MinAPS = MinExpr->getIntegerConstantExpr(S.Context);
+  auto MaxAPS = MaxExpr->getIntegerConstantExpr(S.Context);
+  assert(MinExpr != nullptr && MaxExpr != nullptr);
+  if (!MinAPS || !MaxAPS) {
+    S.Diag(A.getLoc(), diag::err_pragma_loopbound_invalid_values);
+    return nullptr;
+  }
+
+  auto MinInt = *MinAPS;
+  auto MaxInt = *MaxAPS;
+
+  if ( dyn_cast<DoStmt>(St) && MinInt < 1 ) {
+    S.Diag(A.getLoc(), diag::err_pragma_loopbound_invalid_values_do_while);
+    return nullptr;
+  }
+  if ( MinInt < 0 || MaxInt < 0 || MinInt > MaxInt ) {
+    S.Diag(A.getLoc(), diag::err_pragma_loopbound_invalid_values);
+    return nullptr;
+  }
+  auto int_bits = (sizeof(int)*8);
+  if ( MinInt.getMinSignedBits() > int_bits ||
+       MaxInt.getMinSignedBits() > int_bits ) {
+    S.Diag(A.getLoc(), diag::err_pragma_loopbound_excessive_values);
+    return nullptr;
+  }
+
+  return ::new (S.Context) LoopBoundAttr(S.Context, A,
+      (int) MinInt.getExtValue(), (int) MaxInt.getExtValue());
+}
+
 namespace {
 class CallExprFinder : public ConstEvaluatedExprVisitor<CallExprFinder> {
   bool FoundAsmStmt = false;
@@ -696,6 +740,8 @@ static Attr *ProcessStmtAttribute(Sema &S, Stmt *St, const ParsedAttr &A,
     return handleFallThroughAttr(S, St, A, Range);
   case ParsedAttr::AT_LoopHint:
     return handleLoopHintAttr(S, St, A, Range);
+  case ParsedAttr::AT_LoopBound:
+    return handleLoopboundAttr(S, St, A, Range);
   case ParsedAttr::AT_HLSLLoopHint:
     return handleHLSLLoopHintAttr(S, St, A, Range);
   case ParsedAttr::AT_HLSLControlFlowHint:

@@ -594,7 +594,8 @@ static bool getHidden(RelocationRef RelRef) {
 /// Get the column at which we want to start printing the instruction
 /// disassembly, taking into account anything which appears to the left of it.
 unsigned objdump::getInstStartColumn(const MCSubtargetInfo &STI) {
-  return !ShowRawInsn ? 16 : STI.getTargetTriple().isX86() ? 40 : 24;
+  auto Triple = STI.getTargetTriple();
+  return !ShowRawInsn ? 16 : (Triple.isX86() || Triple.isPatmos()) ? 40 : 24;
 }
 
 static void AlignToInstStartColumn(size_t Start, const MCSubtargetInfo &STI,

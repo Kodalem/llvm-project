@@ -3633,6 +3633,15 @@ public:
   void EmitIndirectGotoStmt(const IndirectGotoStmt &S);
   void EmitIfStmt(const IfStmt &S);
 
+  // Emits the loop bounds as call to "llvm.loop.bound"
+  // If one_higher is true, the bounds are set to be one higher than what is given
+  // by the loopbound attribute.
+  //
+  // This would e.g. be needed in while- and for- loops where the condition is checked 1 time
+  // more than the body is executed.
+  // This ensures correctness with llvm.loop.bound, which doesn't differentiate
+  // between loop condition and body.
+  void EmitLoopBounds(llvm::BasicBlock *BB, const ArrayRef<const Attr *> &Attrs, bool one_higher);
   void EmitWhileStmt(const WhileStmt &S, ArrayRef<const Attr *> Attrs = {});
   void EmitDoStmt(const DoStmt &S, ArrayRef<const Attr *> Attrs = {});
   void EmitForStmt(const ForStmt &S, ArrayRef<const Attr *> Attrs = {});

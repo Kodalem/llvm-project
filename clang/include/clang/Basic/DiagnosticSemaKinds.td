@@ -1228,6 +1228,12 @@ def err_pragma_loop_compatibility : Error<
   "%select{incompatible|duplicate}0 directives '%1' and '%2'">;
 def err_pragma_loop_precedes_nonloop : Error<
   "expected a for, while, or do-while loop to follow '%0'">;
+def err_pragma_loopbound_invalid_values : Error<
+  "invalid values; expected min >= 0 && max >= 0 && min <= max">;
+def err_pragma_loopbound_invalid_values_do_while : Error<
+  "invalid minimum loop bound; do-while loops must have mininum bound >= 1">;
+def err_pragma_loopbound_excessive_values : Error<
+  "values are too large">;
 
 def err_pragma_attribute_matcher_subrule_contradicts_rule : Error<
   "redundant attribute subject matcher sub-rule '%0'; '%1' already matches "

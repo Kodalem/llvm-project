@@ -94,6 +94,7 @@ public:
     nvptx,       // NVPTX: 32-bit
     nvptx64,     // NVPTX: 64-bit
     amdil,       // AMDIL
+    patmos,      // Patmos: patmos
     amdil64,     // AMDIL with 64-bit pointers
     hsail,       // AMD HSAIL
     hsail64,     // AMD HSAIL with 64-bit pointers
@@ -1069,6 +1070,10 @@ public:
   /// Tests whether the target is MIPS (little and big endian, 32- or 64-bit).
   bool isMIPS() const {
     return isMIPS32() || isMIPS64();
+  }
+
+  bool isPatmos() const {
+    return getArch() == Triple::patmos;
   }
 
   /// Tests whether the target is PowerPC (32- or 64-bit LE or BE).

@@ -1,0 +1,42 @@
+name: 'Test Bencharks'
+description: 'Build then run the benchmark suite'
+inputs:
+  artifact-name:
+    description: 'The name to use for the github artifact uploaded of the built package.'
+    required: true
+    
+runs:
+  using: "composite"
+  steps: 
+    # Download package
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{inputs.artifact-name}}
+        path: ${{env.INSTALL_PATH}}
+    # Install Package
+    - name: Install Compiler Binaries
+      working-directory: ${{env.INSTALL_PATH}}
+      shell: bash
+      run: tar -xvf $(find . -name 'patmos-llvm-*.tar.gz')
+    # Create Bench build folder
+    - name: Create build folder
+      shell: bash
+      run: mkdir -p $BENCH_BUILD_PATH
+    # Download Benchmark
+    - name: Download Benchmark test suite
+      env:
+        BENCH_COMMIT: 4d5a76ab65df952ac41dd2da85fe067a3bb2d96a
+      shell: bash
+      run: |
+        git clone https://github.com/t-crest/patmos-benchmarks ${{env.BENCH_PATH}}
+        cd ${{env.BENCH_PATH}}
+        git checkout $BENCH_COMMIT
+    # Build & Tests Benchmarks
+    - name: Build & Test Benchmarks
+      working-directory: ${{env.BENCH_BUILD_PATH}}
+      shell: bash
+      run: |
+        cmake $GITHUB_WORKSPACE/$BENCH_PATH -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/$BENCH_PATH/cmake/patmos-clang-toolchain.cmake -DENABLE_TESTING=true
+        make $J
+        ctest $J -V

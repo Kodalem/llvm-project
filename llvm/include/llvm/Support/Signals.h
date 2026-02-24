@@ -18,6 +18,7 @@
 #include "llvm/Support/Compiler.h"
 #include <cstdint>
 #include <string>
+#include <cstdint>
 
 #if LLVM_ENABLE_DEBUGLOC_TRACKING_ORIGIN
 #include "llvm/ADT/DenseMap.h"

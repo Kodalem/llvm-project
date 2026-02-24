@@ -461,6 +461,12 @@ public:
 
   std::vector<std::string> Reciprocals;
 
+  /// List of functions that should be code generated with constant execution time
+  std::vector<std::string> PatmosCetFuncs;
+
+  /// Path to where the serialized PML should be saved.
+  std::string SerializePmlPath;
+
   /// Configuration for pointer-signing.
   PointerAuthOptions PointerAuth;
 

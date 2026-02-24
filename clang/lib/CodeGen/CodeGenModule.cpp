@@ -236,6 +236,9 @@ createTargetCodeGenInfo(CodeGenModule &CGM) {
     return createRISCVTargetCodeGenInfo(CGM, XLen, ABIFLen, EABI);
   }
 
+    case llvm::Triple::patmos:
+    return createPatmosTargetCodeGenInfo(CGM);
+
   case llvm::Triple::systemz: {
     bool SoftFloat = CodeGenOpts.FloatABI == "soft";
     bool HasVector = !SoftFloat && Target.getABI() == "vector";

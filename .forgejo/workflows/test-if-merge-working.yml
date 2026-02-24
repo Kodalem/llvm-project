@@ -1,0 +1,20 @@
+name: Build Nix modules (dry-run)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-modules:
+    runs-on: lix
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Nix Build (dry-run)
+        env:
+          NIX_CONFIG: experimental-features = nix-command flakes
+        run: |
+          set -eux
+          nix build

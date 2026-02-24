@@ -1,0 +1,61 @@
+name: 'Install Dependencies'
+description: 'Installs needed dependencies.'
+    
+runs:
+  using: "composite"
+  steps: 
+    - if: runner.os == 'macOS'
+      name: Install utilities
+      shell: bash
+      run: |
+        brew install texinfo binutils
+    - if: runner.os == 'macOS' && matrix.platform == 'macos-13'
+      name: Add utilities to PATH
+      shell: bash
+      run: |
+        # Set gtar to be available as 'tar'
+        echo "/usr/local/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
+        # Set binutils to be default (needed for "ar")
+        echo "/usr/local/opt/binutils/bin" >> $GITHUB_PATH
+    - if: runner.os == 'macOS' && matrix.platform != 'macos-13'
+      name: Add utilities to PATH
+      shell: bash
+      run: |
+        # Set gtar to be available as 'tar'
+        echo "/opt/homebrew/opt/gnu-tar/libexec/gnubin" >> $GITHUB_PATH
+        # Set binutils to be default (needed for "ar")
+        echo "/opt/homebrew/opt/binutils/bin" >> $GITHUB_PATH
+    - if: runner.os == 'macOS'
+      name: Check Utilities Used
+      shell: bash
+      run: |
+        which tar   
+        which ar
+        tar --version     
+        ar --version
+    - name: Create Installation Directory
+      shell: bash
+      run: mkdir -p $INSTALL_PATH
+    - if: runner.os == 'macOS'
+      name: Download Dependencies (MacOs)
+      working-directory: ${{env.INSTALL_PATH}}
+      shell: bash
+      run: |
+        wget -O patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-apple-darwin.tar.gz
+    - if: runner.os == 'Linux'
+      name: Download Dependencies (Linux)
+      working-directory: ${{env.INSTALL_PATH}}
+      shell: bash
+      run: |
+        wget -O patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
+    - name: Install Dependencies
+      working-directory: ${{env.INSTALL_PATH}}
+      shell: bash
+      run: |
+        # Extract dependencies
+        tar -xvf patmos-simulator.tar.gz
+        # Set path
+        echo "$GITHUB_WORKSPACE/$INSTALL_PATH/bin" >> $GITHUB_PATH
+    
+    
+    

@@ -1320,6 +1320,8 @@ StringRef ELFObjectFile<ELFT>::getFileFormatName() const {
       return "elf32-sparc";
     case ELF::EM_AMDGPU:
       return "elf32-amdgpu";
+    case ELF::EM_PATMOS:
+       return "elf32-patmos";
     case ELF::EM_LOONGARCH:
       return "elf32-loongarch";
     case ELF::EM_XTENSA:
@@ -1443,6 +1445,8 @@ template <class ELFT> Triple::ArchType ELFObjectFile<ELFT>::getArch() const {
     return Triple::ve;
   case ELF::EM_CSKY:
     return Triple::csky;
+  case ELF::EM_PATMOS:
+    return Triple::patmos;
 
   case ELF::EM_LOONGARCH:
     switch (EF.getHeader().e_ident[ELF::EI_CLASS]) {

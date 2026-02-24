@@ -150,6 +150,7 @@ VALUE_CODEGENOPT(XRaySelectedFunctionGroup, 32, 0, Benign)
 VALUE_CODEGENOPT(PatchableFunctionEntryCount , 32, 0, Benign) ///< Number of NOPs at function entry
 VALUE_CODEGENOPT(PatchableFunctionEntryOffset , 32, 0, Benign)
 
+CODEGENOPT(PatmosEnableCet , 1, 0) ///< Set when -mpatmos-enable-cet.
 CODEGENOPT(HotPatch, 1, 0, Benign) ///< Supports the Microsoft /HOTPATCH flag and
                                    ///< generates a 'patchable-function' attribute.
 

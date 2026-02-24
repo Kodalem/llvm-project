@@ -147,7 +147,7 @@ if(LLVM_INCLUDE_SPIRV_TOOLS_TESTS)
     spirv-as
     spirv-link
     )
-endif()    
+endif()
 
 if( NOT CLANG_BUILT_STANDALONE )
   list(APPEND CLANG_TEST_DEPS
@@ -243,5 +243,6 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/debuginfo-tests)
     add_subdirectory(debuginfo-tests)
   endif()
 endif()
+add_subdirectory(Driver) # TODO: CHRISTINE, THE STUBBORN BITCH (affectionate), INVESTIGATE WHAT IS THE PURPOSE OF THIS - CHRISTINE
 
 add_subdirectory(Analysis/LifetimeSafety)
