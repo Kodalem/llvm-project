@@ -24,6 +24,7 @@
 #include "TargetInfo/PatmosTargetInfo.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/CodeGen/MachineLoopInfo.h"
+#include "optional"
 
 #include <map>
 #include <set>
@@ -79,7 +80,7 @@ void OppositePredicateCompensation::compensate(MachineFunction &MF)
 	    auto new_instr_builder = BuildMI(BB, *instr_iter, DebugLoc(), TII->get(Patmos::LWM), Patmos::R0);
         Register pred;
         unsigned neg_flag;
-        Optional<unsigned> add_eq_class;
+        std::optional<unsigned> add_eq_class;
         if(PatmosSinglePathInfo::useNewSinglePathTransform()) {
 	      // Simply negate the assigned predicate
 	      new_instr_builder.addReg(instr_iter->getOperand(instr_iter->findFirstPredOperandIdx()).getReg())

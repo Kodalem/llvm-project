@@ -17,6 +17,8 @@
 #include "PatmosSubtarget.h"
 #include "PatmosSinglePathInfo.h"
 #include "PatmosMachineFunctionInfo.h"
+// ReachingDefInfo wrapper pass used by the legacy pass manager.
+#include "llvm/CodeGen/ReachingDefAnalysis.h"
 
 namespace llvm {
 
@@ -49,9 +51,12 @@ namespace llvm {
 		}
 
 		void getAnalysisUsage(AnalysisUsage &AU) const override {
-			AU.addRequired<MachineLoopInfo>();
-			AU.addPreserved<MachineLoopInfo>();
-			MachineFunctionPass::getAnalysisUsage(AU);
+					        AU.addRequired<MachineLoopInfoWrapperPass>();
+					        AU.addPreserved<MachineLoopInfoWrapperPass>();
+					        // ReachingDefInfo is provided via the wrapper pass in the legacy PM.
+					        AU.addRequired<ReachingDefInfoWrapperPass>();
+					        AU.addPreserved<ReachingDefInfoWrapperPass>();
+		        MachineFunctionPass::getAnalysisUsage(AU);
 		}
 
 		bool runOnMachineFunction(MachineFunction &MF) override;

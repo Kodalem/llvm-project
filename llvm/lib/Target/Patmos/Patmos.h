@@ -33,7 +33,8 @@ namespace llvm {
   void initializePatmosPostRASchedulerPass(PassRegistry&);
   void initializePatmosPMLProfileImportPasS(PassRegistry&);
 
-  FunctionPass *createPatmosISelDag(PatmosTargetMachine &TM, llvm::CodeGenOpt::Level OptLevel);
+  FunctionPass *createPatmosISelDag(PatmosTargetMachine &TM,
+                                    llvm::CodeGenOptLevel OptLevel);
   ModulePass   *createPatmosSPClonePass();
   ModulePass   *createPatmosSPMarkPass(PatmosTargetMachine &tm);
   FunctionPass *createPatmosSinglePathInfoPass(const PatmosTargetMachine &tm);

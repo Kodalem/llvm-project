@@ -30,6 +30,9 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/IR/Attributes.h"
+
+#include "PatmosGenRegisterInfo.inc"
 
 using namespace llvm;
 
@@ -50,11 +53,11 @@ static cl::opt<bool> EnableBlockAlignedStackCache
           ("mpatmos-enable-block-aligned-stack-cache", cl::init(false),
            cl::desc("Enable the use of Patmos' block-aligned stack cache"));
 
-bool PatmosFrameLowering::hasFP(const MachineFunction &MF) const {
-  MachineFrameInfo &MFI = MF.getFrameInfo();
+bool PatmosFrameLowering::hasFPImpl(const MachineFunction &MF) const {
+  const MachineFrameInfo &MFI = MF.getFrameInfo();
 
   // Naked functions should not use the stack, they do not get a frame pointer.
-  if (MF.getFunction().hasFnAttribute(Attribute::Naked))
+  if (MF.getFunction().hasFnAttribute("naked"))
     return false;
 
   return (MF.getTarget().Options.DisableFramePointerElim(MF) ||
@@ -105,7 +108,7 @@ void PatmosFrameLowering::assignFIsToStackCache(MachineFunction &MF,
     if (i->getReg() == Patmos::S0 && PMFI.getS0SpillReg()) continue;
     // Predicates are handled via aliasing to S0. They appear here when we
     // skip assigning s0 to a stack slot, not really sure why.
-    if (Patmos::PRegsRegClass.contains(i->getReg())) continue;
+    if (TRI->getRegClass(Patmos::PRegsRegClassID)->contains(i->getReg())) continue;
     SCFIs[i->getFrameIdx()] = true;
   }
 
@@ -389,7 +392,7 @@ void PatmosFrameLowering::determineCalleeSaves(MachineFunction &MF,
   DebugLoc DL;
 
   // Do not emit anything for naked functions
-  if (MF.getFunction().hasFnAttribute(Attribute::Naked)) {
+  if (MF.getFunction().hasFnAttribute("naked")) {
     return;
   }
 
@@ -410,7 +413,7 @@ void PatmosFrameLowering::determineCalleeSaves(MachineFunction &MF,
   }
 
   if (TRI->requiresRegisterScavenging(MF)) {
-    const TargetRegisterClass &RC = Patmos::RRegsRegClass;
+    const TargetRegisterClass &RC = *TRI->getRegClass(Patmos::RRegsRegClassID);
     int fi = MFI.CreateStackObject(TRI->getSpillSize(RC), TRI->getSpillAlign(RC), false);
     RS->addScavengingFrameIndex(fi);
     PMFI.setRegScavengingFI(fi);
@@ -463,51 +466,54 @@ static Register get_special_spill_restore_reg(Register Reg)
 }
 
 bool
-PatmosFrameLowering::spillCalleeSavedRegisters(MachineBasicBlock &MBB,
-                                               MachineBasicBlock::iterator MI,
-                                               ArrayRef<CalleeSavedInfo> CSI,
-                                               const TargetRegisterInfo *TRI) const {
+PatmosFrameLowering::spillCalleeSavedRegisters(
+    MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
+    ArrayRef<CalleeSavedInfo> CSI, Register TRI) const {
   if (CSI.empty())
     return false;
 
   DebugLoc DL;
   if (MI != MBB.end()) DL = MI->getDebugLoc();
 
-  MachineFunction &MF = *MBB.getParent();
-  const TargetInstrInfo &TII = *STC.getInstrInfo();
+   MachineFunction &MF = *MBB.getParent();
+   const TargetInstrInfo &TII = *STC.getInstrInfo();
+   const TargetRegisterInfo *TRIptr = STC.getRegisterInfo();
 
   // Start by spilling general-purpose registers
   std::vector<Register> rreg_spilled;
   std::map<Register, unsigned> sreg_unspilled; // Special-purpose register in need of spilling and their frame_idx
-  for (unsigned i = 0; i < CSI.size(); i++) {
-	auto Reg = CSI[i].getReg();
-	auto frame_idx = CSI[i].getFrameIdx();
-    // Add the callee-saved register as live-in. It's killed at the spill.
-    MBB.addLiveIn(Reg);
-	if(Patmos::RRegsRegClass.contains(Reg)) {
+   for (unsigned i = 0; i < CSI.size(); i++) {
+	    auto Reg = CSI[i].getReg();
+	    auto frame_idx = CSI[i].getFrameIdx();
+	    // Add the callee-saved register as live-in. It's killed at the spill.
+	    MBB.addLiveIn(Reg);
 
-		// spill
-		const TargetRegisterClass *RC = TRI->getMinimalPhysRegClass(Reg);
-		TII.storeRegToStackSlot(MBB, MI, Reg, true,
-				frame_idx, RC, TRI);
-		std::prev(MI)->setFlag(MachineInstr::FrameSetup);
+        // Use TRI to lookup register classes by ID (modern LLVM)
+        if (TRIptr->getRegClass(Patmos::RRegsRegClassID)->contains(Reg)) {
 
-		rreg_spilled.push_back(Reg);
-	} else if(Patmos::PRegsRegClass.contains(Reg)) {
-		assert(std::any_of(CSI.begin(), CSI.end(), [&](auto info){
-			return info.getReg() == Patmos::S0;
-		}) && "Must spill S0 instead of individual predicate registers");
-	} else {
-		assert(Patmos::SRegsRegClass.contains(Reg));
+    		// spill: obtain a physical register class for this register
+        const TargetRegisterClass *RC = TRIptr->getMinimalPhysRegClass(Reg);
+        TII.storeRegToStackSlot(MBB, MI, Reg, true,
+                frame_idx, RC, Register());
+    		std::prev(MI)->setFlag(MachineInstr::FrameSetup);
 
-		// We don't spill special-purpose register now, as we want to know which
-		// general-purpose registers we're spilling, so we can reuse them for
-		// spilling the specials.
-		// This is crucial for single-path code, because a disabled function can't change any registers.
-		// Therefore we know we can use the spilled general-purpose registers since they will later be restored.
-		sreg_unspilled[Reg] = frame_idx;
-	}
-  }
+    		rreg_spilled.push_back(Reg);
+        } else if (TRIptr->getRegClass(Patmos::PRegsRegClassID)->contains(Reg)) {
+    		// Fixed lambda: must return the comparison result
+    		assert(std::any_of(CSI.begin(), CSI.end(), [&](const CalleeSavedInfo &info){
+    			return info.getReg() == Patmos::S0;
+    		}) && "Must spill S0 instead of individual predicate registers");
+    	} else {
+        assert(TRIptr->getRegClass(Patmos::SRegsRegClassID)->contains(Reg));
+
+    		// We don't spill special-purpose register now, as we want to know which
+    		// general-purpose registers we're spilling, so we can reuse them for
+    		// spilling the specials.
+    		// This is crucial for single-path code, because a disabled function can't change any registers.
+    		// Therefore we know we can use the spilled general-purpose registers since they will later be restored.
+    		sreg_unspilled[Reg] = frame_idx;
+    	}
+   }
 
   // Spill special-purpose registers
   for(auto entry: sreg_unspilled) {
@@ -529,8 +535,8 @@ PatmosFrameLowering::spillCalleeSavedRegisters(MachineBasicBlock &MBB,
 	  TII.copyPhysReg(MBB, MI, DL, tmpReg, reg, true);
 	  std::prev(MI)->setFlag(MachineInstr::FrameSetup);
 	  // Spill the value
-	  TII.storeRegToStackSlot(MBB, MI, tmpReg, true,
-	  			frame_idx, &Patmos::RRegsRegClass, TRI);
+      TII.storeRegToStackSlot(MBB, MI, tmpReg, true,
+                frame_idx, TRIptr->getRegClass(Patmos::RRegsRegClassID), Register());
 		std::prev(MI)->setFlag(MachineInstr::FrameSetup);
   }
 
@@ -564,18 +570,18 @@ PatmosFrameLowering::restoreCalleeSavedRegisters(MachineBasicBlock &MBB,
   std::vector<std::pair<Register, unsigned>> rregs;
   std::map<Register, unsigned> sregs;
   for (unsigned i = 0; i < CSI.size(); i++) {
-	auto Reg = CSI[i].getReg();
-	auto frame_idx = CSI[i].getFrameIdx();
-	if(Patmos::RRegsRegClass.contains(Reg)) {
-	  rregs.push_back(std::make_pair(Reg, frame_idx));
-	} else if(Patmos::PRegsRegClass.contains(Reg)) {
-		assert(std::any_of(CSI.begin(), CSI.end(), [&](auto info){
-			return info.getReg() == Patmos::S0;
-		}) && "Must restore S0 instead of individual predicate registers");
-	} else {
-	  assert(Patmos::SRegsRegClass.contains(Reg));
-	  sregs[Reg] = frame_idx;
-	}
+    auto Reg = CSI[i].getReg();
+    auto frame_idx = CSI[i].getFrameIdx();
+    if (TRI->getRegClass(Patmos::RRegsRegClassID)->contains(Reg)) {
+      rregs.push_back(std::make_pair(Reg, frame_idx));
+    } else if (TRI->getRegClass(Patmos::PRegsRegClassID)->contains(Reg)) {
+      assert(std::any_of(CSI.begin(), CSI.end(), [&](const CalleeSavedInfo &info){
+        return info.getReg() == Patmos::S0;
+      }) && "Must restore S0 instead of individual predicate registers");
+    } else {
+        assert(TRI->getRegClass(Patmos::SRegsRegClassID)->contains(Reg));
+      sregs[Reg] = frame_idx;
+    }
   }
 
   // Restore special-purpose registers
@@ -595,7 +601,7 @@ PatmosFrameLowering::restoreCalleeSavedRegisters(MachineBasicBlock &MBB,
 	  }
 
 	  // load
-	  TII.loadRegFromStackSlot(MBB, MI, tmpReg, frame_idx, &Patmos::RRegsRegClass, TRI);
+      TII.loadRegFromStackSlot(MBB, MI, tmpReg, frame_idx, TRI->getRegClass(Patmos::RRegsRegClassID), Register());
 	  std::prev(MI)->setFlag(MachineInstr::FrameSetup);
 
 	  // Move value to special register
@@ -609,7 +615,7 @@ PatmosFrameLowering::restoreCalleeSavedRegisters(MachineBasicBlock &MBB,
 	  auto frame_idx = entry.second;
 
 	  // load
-	  TII.loadRegFromStackSlot(MBB, MI, reg, frame_idx, &Patmos::RRegsRegClass, TRI);
+      TII.loadRegFromStackSlot(MBB, MI, reg, frame_idx, TRI->getRegClass(Patmos::RRegsRegClassID), Register());
 	  std::prev(MI)->setFlag(MachineInstr::FrameSetup);
   }
 

@@ -332,7 +332,7 @@ bool PatmosDelaySlotFiller::hasDefUseDep(const MachineInstr *D,
   for (unsigned i = 0; i != e; ++i) {
     const MachineOperand &MO = U->getOperand(i);
     // if the operand is a use and D defines it, we have a def-use dependence
-    if ( MO.isReg() && MO.readsReg() && D->definesRegister(MO.getReg()) ) {
+    if (MO.isReg() && MO.isUse() && D->definesRegister(MO.getReg(), TRI)) {
       return true;
     }
   }

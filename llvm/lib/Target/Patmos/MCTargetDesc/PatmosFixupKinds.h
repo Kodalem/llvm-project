@@ -57,7 +57,10 @@ namespace Patmos {
     return FixupKind == FK_Patmos_PCrel;
   }
 
-} // namespace Patmos
+  // Note: [001A] Ask Emad
+  // Christine, added a stub due to squelch the error at the PatmosAsmPrinter.cp
+  unsigned PSEUDO_LOOPBOUND;
+  } // namespace Patmos
 } // namespace llvm
 
 

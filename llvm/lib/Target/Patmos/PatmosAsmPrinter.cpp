@@ -31,9 +31,14 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/MC/MCParser/MCAsmParser.h"
 #include "llvm/MC/MCParser/MCTargetAsmParser.h"
+#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
+
 #include <memory>
-#include <string>
 #include <stdexcept>
+#include <string>
 
 using namespace llvm;
 
@@ -60,9 +65,9 @@ std::string string_format( const std::string& format, Args ... args )
     int size_s = std::snprintf( nullptr, 0, format.c_str(), args ... ) + 1; // Extra space for '\0'
     if( size_s <= 0 ){ report_fatal_error( "Error during formatting." ); }
     auto size = static_cast<size_t>( size_s );
-    std::unique_ptr<char[]> buf( new char[ size ] );
-    std::snprintf( buf.get(), size, format.c_str(), args ... );
-    return std::string( buf.get(), buf.get() + size - 1 ); // We don't want the '\0' inside
+    std::unique_ptr<char[]> Buf( new char[ size ] );
+    std::snprintf( Buf.get(), size, format.c_str(), args ... );
+    return std::string( Buf.get(), Buf.get() + size - 1 ); // We don't want the '\0' inside
 }
 
 void PatmosAsmPrinter::emitBasicBlockStart(const MachineBasicBlock &MBB) {
@@ -116,12 +121,18 @@ void PatmosAsmPrinter::emitBasicBlockStart(const MachineBasicBlock &MBB) {
 void PatmosAsmPrinter::emitBasicBlockBegin(const MachineBasicBlock &MBB) {
   // Print loop bound information if needed
   if (auto loop_bounds = getLoopBounds(&MBB)){
-    OutStreamer->GetCommentOS() << "Loop bound: [";
-    OutStreamer->GetCommentOS() << loop_bounds->first;
-    OutStreamer->GetCommentOS() << ", ";
-    OutStreamer->GetCommentOS() << loop_bounds->second;
-    OutStreamer->GetCommentOS() << "]\n";
-    OutStreamer->AddBlankLine();
+  // Todo: Look into where GetCommentOS came from and what happened to it.
+    // It got yeeted in favour of AddComment and addBlankLine
+    // https://llvm.org/doxygen/classllvm_1_1MCStreamer.html
+    // https://llvm.org/doxygen/MCAsmStreamer_8cpp_source.html
+    // AddComment takes a Twine and an optional EOL flag. Emit the parts
+    // without ending the line until the final piece.
+    OutStreamer->AddComment("Loop bound: [", /*EOL=*/false);
+    OutStreamer->AddComment(Twine(loop_bounds->first), /*EOL=*/false);
+    OutStreamer->AddComment(", ", /*EOL=*/false);
+    OutStreamer->AddComment(Twine(loop_bounds->second), /*EOL=*/false);
+    OutStreamer->AddComment("]", /*EOL=*/true);
+    OutStreamer->addBlankLine();
   }
 }
 
@@ -201,6 +212,9 @@ void PatmosAsmPrinter::emitInstruction(const MachineInstr *MI) {
     assert(Size == MI->getBundleSize() && "Corrupt Bundle!");
   }
   else {
+    // Todo: What does it do?
+    // Remove it?
+    // Note: [001A] Ask Emad
     if (MI->getOpcode() == Patmos::PSEUDO_LOOPBOUND) {
       return;
     }
@@ -435,7 +449,9 @@ static void EmitGCCInlineAsmStr(const char *AsmStr, const MachineInstr *MI,
         for (; Val; --Val) {
           if (OpNo >= MI->getNumOperands()) break;
           unsigned OpFlags = MI->getOperand(OpNo).getImm();
-          OpNo += InlineAsm::getNumOperandRegisters(OpFlags) + 1;
+          // InlineAsm::getNumOperandRegisters(OpFlags) got changed in
+          // favour of the following
+          OpNo += InlineAsm::Flag(OpFlags).getNumOperandRegisters() + 1;
         }
 
         // We may have a location metadata attached to the end of the
@@ -461,7 +477,9 @@ static void EmitGCCInlineAsmStr(const char *AsmStr, const MachineInstr *MI,
             Sym->print(OS, AP->MAI);
           } else if (Modifier[0] == 'l') {
             Error = true;
-          } else if (InlineAsm::isMemKind(OpFlags)) {
+            // Same story here, using the whole Flag operator
+            // https://llvm.org/doxygen/classllvm_1_1InlineAsm_1_1Flag.html
+          } else if (InlineAsm::Flag(OpFlags).isMemKind()) {
             Error = AP->PrintAsmMemoryOperand(
                 MI, OpNo, Modifier[0] ? Modifier : nullptr, OS);
           } else {
@@ -473,7 +491,10 @@ static void EmitGCCInlineAsmStr(const char *AsmStr, const MachineInstr *MI,
           std::string msg;
           raw_string_ostream Msg(msg);
           Msg << "invalid operand in inline asm: '" << AsmStr << "'";
-          MMI->getModule()->getContext().emitError(LocCookie, Msg.str());
+          // LLVM moved away from simple unsigned cookies in the general emitError function
+          MMI->getModule()->getContext().diagnose(
+              DiagnosticInfoInlineAsm(LocCookie, Msg.str(), DS_Error)
+          );
         }
       }
       break;

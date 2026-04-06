@@ -29,11 +29,10 @@ namespace {
 
     ~PatmosELFObjectWriter() override = default;
 
-    unsigned getRelocType(MCContext &Ctx, const MCValue &Target,
-                          const MCFixup &Fixup, bool IsPCRel) const override;
+    unsigned getRelocType(const MCFixup &, const MCValue &,
+                        bool IsPCRel) const override;
 
-    bool needsRelocateWithSymbol(const MCSymbol &Sym,
-                                 unsigned Type) const override
+    bool needsRelocateWithSymbol(const MCValue &, unsigned Type) const override
     {
       switch (Type) {
       case ELF::R_PATMOS_ALUL_ABS:
@@ -51,9 +50,8 @@ PatmosELFObjectWriter::PatmosELFObjectWriter(uint8_t OSABI)
   : MCELFObjectTargetWriter(false, OSABI, ELF::EM_PATMOS,
                             /*HasRelocationAddend*/ false) {}
 
-unsigned PatmosELFObjectWriter::getRelocType(MCContext &Ctx,
+unsigned PatmosELFObjectWriter::getRelocType(const MCFixup &Fixup,
                                              const MCValue &Target,
-                                             const MCFixup &Fixup,
                                              bool IsPCRel) const {
   // TODO determine the type of the relocation, use Patmos types
   switch ((unsigned)Fixup.getKind()) {
@@ -86,6 +84,5 @@ unsigned PatmosELFObjectWriter::getRelocType(MCContext &Ctx,
 std::unique_ptr<MCObjectTargetWriter>
 llvm::createPatmosELFObjectWriter(const Triple &TT) {
   uint8_t OSABI = MCELFObjectTargetWriter::getOSABI(TT.getOS());
-  MCELFObjectTargetWriter *MOTW = new PatmosELFObjectWriter(OSABI);
   return std::make_unique<PatmosELFObjectWriter>(OSABI);
 }

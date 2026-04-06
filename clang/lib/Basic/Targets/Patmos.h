@@ -16,7 +16,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/TargetOptions.h"
 #include "clang/Driver/Driver.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/Compiler.h"
 namespace clang {
@@ -49,13 +49,16 @@ public:
   void getTargetDefines(const LangOptions &Opts,
                         MacroBuilder &Builder) const override;
 
-  ArrayRef<Builtin::Info> getTargetBuiltins() const override { return None; }
+  llvm::SmallVector<Builtin::InfosShard> getTargetBuiltins() const override {
+    // No target-specific builtins for Patmos.
+    return {};
+  }
 
   BuiltinVaListKind getBuiltinVaListKind() const override {
     return TargetInfo::VoidPtrBuiltinVaList;
   }
 
-  const char *getClobbers() const override { return ""; }
+  std::string_view getClobbers() const override { return std::string_view(""); }
 
   ArrayRef<const char *> getGCCRegNames() const override;
 

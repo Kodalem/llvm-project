@@ -19,6 +19,8 @@
 #include "PatmosMCInstLower.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/MC/MCContext.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/MC/MCParser/MCTargetAsmParser.h"
 
 namespace llvm {
   class PatmosAsmPrinter : public AsmPrinter {
@@ -37,10 +39,16 @@ namespace llvm {
     PatmosAsmPrinter(TargetMachine &TM, std::unique_ptr<MCStreamer> Streamer)
       : AsmPrinter(TM, std::move(Streamer)), MCInstLowering(OutContext, *this), CurrCodeEnd(0)
     {
-      if (!(PTM = static_cast<PatmosTargetMachine*>(&TM))) {
+      // Made it use the RTTI instead
+      // https://llvm.org/docs/ProgrammersManual.html#id13
+      if (!(PTM = cast<PatmosTargetMachine>(&TM))) {
         llvm_unreachable("PatmosAsmPrinter must be initialized with a Patmos target configuration.");
       }
-      PTM->Options.MCOptions.MCSaveTempLabels = true;
+
+      // https://github.com/llvm/llvm-project/blob/main/llvm/include/llvm/Target/TargetMachine.h
+      // LLVM (starting around version 18+), the Options member is now protected in the base TargetMachine class.
+      // See llvm/lib/Target/Patmos/PatmosTargetMachine.cpp at around line 360
+      // PTM->Options.MCOptions.MCSaveTempLabels = true;
 
       FStartAlignment = PTM->getSubtargetImpl()->getMinSubfunctionAlignment();
     }

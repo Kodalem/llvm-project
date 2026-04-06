@@ -6,6 +6,35 @@ Fix: https://github.com/tinygo-org/go-llvm
 
 handleLoopboundAttr at Sema/SemaAttr.cpp - Whose is it?
 
+Currenrtl using the RISCV target as example to look into how exactly the system will work and what needs to be migrated.
+Check on the LLVM 
+
+Todo, get a fpga board to try and test the code on to determine if shit actually works.
+
+Create the following dummy target files to learn how targetting works in llvm.
+Read the docs about the tablegen code generator.
+
+Cannot use Ferrocene, because is both not open source and they don't actually edit the LLVM, they just use it as a base.
+And update accordingly in upstream LLVM.
+
+[001A] - Means, that you need to ask Emad about this. Use this number in Control-F to find all instances of this.
+
+TableGen stuff first, if you have missing instruction header thingies
+
+```zsh
+
+# Ensure tblgen is built
+make -C build llvm-tblgen
+
+# Ensure that Patmos table instruction thingies are built
+build/bin/llvm-tblgen -gen-instr-info -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenInstrInfo.inc
+make -C build llvm-tblgen && build/bin/llvm-tblgen -gen-register-info -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenRegisterInfo.inc
+cp build/lib/Target/Patmos/PatmosGenRegisterInfo* llvm/lib/Target/Patmos/ 
+build/bin/llvm-tblgen -gen-asm-matcher -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenAsmMatcher.inc
+cp build/lib/Target/Patmos/PatmosGenAsmMatcher.inc llvm/lib/Target/Patmos/
+
+```
+
 Patmos LLVM
 ================
 

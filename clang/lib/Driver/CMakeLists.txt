@@ -68,15 +68,17 @@ add_clang_library(clangDriver
   ToolChains/LFILinux.cpp
   ToolChains/Linux.cpp
   ToolChains/Managarm.cpp
-  ToolChains/MipsLinux.cpp
   ToolChains/MinGW.cpp
-  ToolChains/MSP430.cpp
-  ToolChains/MSVC.cpp
+  ToolChains/MinGW.h
+  ToolChains/MipsLinux.cpp
+  ToolChains/MipsLinux.h
   ToolChains/NetBSD.cpp
+  ToolChains/NetBSD.h
   ToolChains/OHOS.cpp
+  ToolChains/OHOS.h
   ToolChains/OpenBSD.cpp
+  ToolChains/OpenBSD.h
   ToolChains/PS4CPU.cpp
-  ToolChains/RISCVToolchain.cpp
   ToolChains/Patmos.cpp
   ToolChains/Solaris.cpp
   ToolChains/SPIRV.cpp

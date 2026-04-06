@@ -953,7 +953,7 @@ void PatmosSPReduce::applyPredicates(SPScope *S, MachineFunction &MF) {
       auto instrPredNeg = instrPreds[&(*MI)].second ? 1 : 0;
       auto predReg = predRegs.count(instrPred) ? predRegs[instrPred] : Patmos::P0;
       DEBUG_TRACE( dbgs() << "Predicate (" << instrPred << ") set to register: (" << predReg << ")\n");
-      if (MI->isCall() && !PatmosSinglePathInfo::isPseudoRoot(*getCallTargetMF(&*MI))) {
+      if (MI->isCall() && !PatmosSinglePathInfo::isPseudoRoot(*getCallTargetMF(&*MI, TODO))) {
           DEBUG_TRACE( dbgs() << "    call: " << *MI );
           assert(!TII->isPredicated(*MI) && "call predicated");
           DebugLoc DL = MI->getDebugLoc();
@@ -1268,7 +1268,7 @@ void PatmosSPReduce::collectReturnInfoInsts(MachineFunction &MF) {
         bool found = false;
         while (!found) {
           // if DMI defines reg
-          if (DMI->definesRegister(reg)) {
+          if (DMI->definesRegister(reg, TRI)) {
             assert(DMI->getFlag(MachineInstr::FrameSetup));
             ReturnInfoInsts.insert(&*DMI);
             LLVM_DEBUG(dbgs() << "         #" << MBB->getNumber() << ": ";

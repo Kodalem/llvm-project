@@ -88,7 +88,7 @@ void PreRegallocReduce::applyPredicates(MachineFunction *MF) {
 				LLVM_DEBUG(dbgs() << "    skip frame setup: " << *MI);
 			}
 
-			if (MI->isCall() && !PatmosSinglePathInfo::isPseudoRoot(*getCallTargetMF(&*MI))) {
+			if (MI->isCall() && !PatmosSinglePathInfo::isPseudoRoot(*getCallTargetMF(&*MI, TODO))) {
 				LLVM_DEBUG( dbgs() << "    call: " << *MI );
 				assert(!TII->isPredicated(*MI) && "call predicated");
 				DebugLoc DL = MI->getDebugLoc();

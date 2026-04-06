@@ -12,7 +12,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "PatmosTargetStreamer.h"
+#include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCSymbolELF.h"
+#include "llvm/MC/MCAsmInfo.h"
+#include "llvm/MC/MCContext.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
 
@@ -30,7 +33,15 @@ PatmosTargetAsmStreamer::PatmosTargetAsmStreamer(MCStreamer &S,
 void PatmosTargetAsmStreamer::emitFStart(const MCSymbol *Start,
                                const MCExpr* Size, Align Alignment)
 {
-  OS << "\t.fstart\t" << *Start << ", " << *Size << ", " << Alignment.value() << "\n";
+  // Print the start symbol and the size expression. Use MCExpr::print to
+  // handle all expression kinds correctly (pass nullptr for MCAsmInfo as
+  // this is used by dump() and some asm printing paths).
+  OS << "\t.fstart\t" << *Start << ", ";
+  if (Size)
+    getContext().getAsmInfo()->printExpr(OS, *Size);
+  else
+    OS << "<null>";
+  OS << ", " << Alignment.value() << "\n";
 }
 
 PatmosTargetELFStreamer::PatmosTargetELFStreamer(MCStreamer &S)
@@ -40,7 +51,7 @@ void PatmosTargetELFStreamer::emitFStart(const MCSymbol *Start,
       const MCExpr* Size, Align Alignment)
 {
   // Pass the subtarget info as nullptr (no STI available here)
-  getStreamer().emitCodeAlignment(Alignment.value(), /*STI*/ nullptr);
+  getStreamer().emitCodeAlignment(Align(Alignment.value()), /*STI*/ nullptr);
   getStreamer().emitValue(Size, 4);
 
 }

@@ -141,7 +141,8 @@ bool MemoryAccessNormalization::runOnMachineFunction(MachineFunction &MF) {
     if(PatmosSinglePathInfo::getCETCompAlgo() == CompensationAlgo::hybrid ||
         PatmosSinglePathInfo::getCETCompAlgo() == CompensationAlgo::counter
     ){
-      auto accessBounds = getAccessBounds(MF, getAnalysis<MachineLoopInfo>());
+      auto &MLI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
+      auto accessBounds = getAccessBounds(MF, MLI);
 
       auto min_accesses = PatmosSinglePathInfo::isRootLike(MF)? accessBounds.first:0;
       auto max_accesses = accessBounds.second;

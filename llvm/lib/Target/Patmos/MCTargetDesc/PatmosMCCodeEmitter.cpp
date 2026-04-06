@@ -30,20 +30,27 @@ using namespace llvm;
 
 namespace {
 class PatmosMCCodeEmitter : public MCCodeEmitter {
-  PatmosMCCodeEmitter(const PatmosMCCodeEmitter &); // DO NOT IMPLEMENT
-  void operator=(const PatmosMCCodeEmitter &); // DO NOT IMPLEMENT
+  PatmosMCCodeEmitter(const PatmosMCCodeEmitter &) = delete;
+  void operator=(const PatmosMCCodeEmitter &) = delete;
 
   const MCInstrInfo &MCII;
   MCContext &Ctx;
 
 public:
-  PatmosMCCodeEmitter(const MCInstrInfo &mcii, const MCRegisterInfo &MRI, 
-                      MCContext &ctx) :
+  PatmosMCCodeEmitter(MCContext &ctx, const MCInstrInfo &mcii) :
             MCII(mcii) , Ctx(ctx) {}
+
+  // Squelch odd-warning errors.
+  PatmosMCCodeEmitter(const MCInstrInfo &mcii, MCContext &ctx)
+      : PatmosMCCodeEmitter(ctx, mcii) {}
+
+  PatmosMCCodeEmitter(const MCInstrInfo &mcii, const MCRegisterInfo &MRI,
+                      MCContext &ctx)
+      : PatmosMCCodeEmitter(ctx, mcii) {}
 
   ~PatmosMCCodeEmitter() override {}
 
-  void encodeInstruction(const MCInst &MI, raw_ostream &OS,
+  void encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
                          SmallVectorImpl<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 
@@ -71,15 +78,15 @@ public:
 
   /****** Helper functions to emit binary code ******/
 
-  void EmitByte(unsigned char C, raw_ostream &OS) const {
-    OS << (char)C;
+  void EmitByte(unsigned char C, SmallVectorImpl<char> &CB) const {
+    CB.push_back(static_cast<char>(C));
   }
 
-  void EmitInstruction(uint64_t Val, unsigned Size, raw_ostream &OS) const {
+  void EmitInstruction(uint64_t Val, unsigned Size, SmallVectorImpl<char> &CB) const {
     // Output the instruction encoding in big endian byte order.
     for (unsigned i = 0; i < Size; ++i) {
       unsigned Shift = (Size - 1 - i) * 8;
-      EmitByte((Val >> Shift) & 0xff, OS);
+      EmitByte(static_cast<unsigned char>((Val >> Shift) & 0xff), CB);
     }
   }
 
@@ -96,17 +103,16 @@ public:
 }  // namespace
 
 MCCodeEmitter *llvm::createPatmosMCCodeEmitter(const MCInstrInfo &MCII,
-                                         const MCRegisterInfo &MRI,
                                          MCContext &Ctx)
 {
-  return new PatmosMCCodeEmitter(MCII, MRI, Ctx);
+  return new PatmosMCCodeEmitter(Ctx, MCII);
 }
 
 
 /// EncodeInstruction - Emit the instruction.
 /// Size the instruction (currently only 4 bytes
 void PatmosMCCodeEmitter::
-encodeInstruction(const MCInst &MI, raw_ostream &OS,
+encodeInstruction(const MCInst &MI, SmallVectorImpl<char> &CB,
                   SmallVectorImpl<MCFixup> &Fixups,
                   const MCSubtargetInfo &STI) const
 {
@@ -139,7 +145,7 @@ encodeInstruction(const MCInst &MI, raw_ostream &OS,
     }
   }
 
-  EmitInstruction(Binary, Size, OS);
+  EmitInstruction(Binary, Size, CB);
 }
 
 /// getMachineOpValue - Return binary encoding of operand. If the machine

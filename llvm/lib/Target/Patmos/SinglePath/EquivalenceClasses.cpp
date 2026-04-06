@@ -36,17 +36,17 @@ bool EquivalenceClasses::runOnMachineFunction(MachineFunction &MF) {
 		MF.dump();
 	);
 
-	auto &LI = getAnalysis<MachineLoopInfo>();
+        auto &LI = getAnalysis<llvm::MachineLoopInfoWrapperPass>().getLI();
 
 	FCFGPostDom doms(MF, LI);
 	LLVM_DEBUG(doms.print(dbgs()));
 
-	std::map<
-		// X
-		MachineBasicBlock*,
-		// Set of {Y->Z} control dependencies
-		std::set<std::pair<Optional<MachineBasicBlock*>,MachineBasicBlock*>>
-	>  deps;
+ 	std::map<
+ 		// X
+ 		MachineBasicBlock*,
+ 		// Set of {Y->Z} control dependencies
+ 		std::set<std::pair<std::optional<MachineBasicBlock*>,MachineBasicBlock*> >
+ 	>  deps;
 	doms.get_control_dependencies(deps);
 
 	LLVM_DEBUG(
@@ -138,14 +138,14 @@ EqClass EquivalenceClasses::getClassFor(MachineBasicBlock *mbb) const{
 	};
 }
 
-std::map<unsigned, std::set<unsigned>> EquivalenceClasses::getAllClassDependencies() const {
+std::map<unsigned, std::set<unsigned> > EquivalenceClasses::getAllClassDependencies() const {
 	// Two classes are dependent if either of them is reachable from the other without
 	// taking any back edges
 
 	MachineDominatorTree MDT(*(*classes.begin()->second.second.begin())->getParent());
 	MachineLoopInfo LI(MDT);
 
-	std::map<unsigned, std::set<unsigned>> dependencies;
+ 	std::map<unsigned, std::set<unsigned> > dependencies;
 
 	// For each class we use breadth first search while ignoring back edges.
 	// For any pair of classes reachable become dependent on each other.
@@ -201,7 +201,7 @@ static MDNode* unsigned_md(unsigned x, LLVMContext &C) {
 	return MDNode::get(C, ConstantAsMetadata::get(ConstantInt::get(C, llvm::APInt(64, x, false))));
 }
 
-static char* CLASS_DEPENDENCY_FUNCTION_MD_NAME = "llvm.patmos.equivalence.class.dependencies";
+static const char* CLASS_DEPENDENCY_FUNCTION_MD_NAME = "llvm.patmos.equivalence.class.dependencies";
 
 void EquivalenceClasses::exportClassDependenciesToModule(MachineFunction &MF) {
 
@@ -227,11 +227,11 @@ void EquivalenceClasses::exportClassDependenciesToModule(MachineFunction &MF) {
 	F.setMetadata(CLASS_DEPENDENCY_FUNCTION_MD_NAME, MDTuple::get(C, mds));
 }
 
-std::map<unsigned, std::set<unsigned>> EquivalenceClasses::importClassDependenciesFromModule(const MachineFunction &MF) {
+std::map<unsigned, std::set<unsigned> > EquivalenceClasses::importClassDependenciesFromModule(const MachineFunction &MF) {
 	LLVM_DEBUG(
 		dbgs() << "Equivalence Class Dependencies:\n";
 	);
-	std::map<unsigned, std::set<unsigned>> result;
+ 	std::map<unsigned, std::set<unsigned> > result;
 
 	auto &F= MF.getFunction();
 	LLVMContext &C = F.getContext();
@@ -269,7 +269,7 @@ std::map<unsigned, std::set<unsigned>> EquivalenceClasses::importClassDependenci
 	return result;
 }
 
-static char* EQUIVALENCE_CLASS_INSTRUCTION_MD_NAME = "patmos.eq.class";
+static const char* EQUIVALENCE_CLASS_INSTRUCTION_MD_NAME = "patmos.eq.class";
 
 void EquivalenceClasses::addClassMetaData(MachineInstr* MI, unsigned class_nr) {
 	auto MF = MI->getParent()->getParent();
@@ -279,21 +279,21 @@ void EquivalenceClasses::addClassMetaData(MachineInstr* MI, unsigned class_nr) {
 	MI->addOperand(*MF, MachineOperand::CreateMetadata(unsigned_md(class_nr, C)));
 }
 
-Optional<unsigned> EquivalenceClasses::getEqClassNr(const MachineInstr* MI) {
+std::optional<unsigned> EquivalenceClasses::getEqClassNr(const MachineInstr* MI) {
 	if(!MI->isPredicable() ||
 		MI->getOperand(MI->findFirstPredOperandIdx()).getReg() == Patmos::P0
 	){
 		// Ignore class if instruction is unpredicated
-		return None;
+		return std::nullopt;
 	}
 
-	Optional<unsigned> idx;
+	std::optional<unsigned> idx;
 	for(int i = 0; i<MI->getNumOperands(); i++){
 		if(MI->getOperand(i).isMetadata()){
 			auto &md = MI->getOperand(i).getMetadata()->getOperand(0);
-			if(auto string = dyn_cast<MDString>(md)) {
-				if(string->getString().equals(EQUIVALENCE_CLASS_INSTRUCTION_MD_NAME)) {
-					idx = i+1;
+			if (auto string = dyn_cast<MDString>(md)) {
+				if (string->getString() == EQUIVALENCE_CLASS_INSTRUCTION_MD_NAME) {
+					idx = i + 1;
 					break;
 				}
 			}
@@ -303,13 +303,13 @@ Optional<unsigned> EquivalenceClasses::getEqClassNr(const MachineInstr* MI) {
 		assert(MI->getOperand(*idx).isMetadata());
 		return cast<ConstantInt>(dyn_cast<ConstantAsMetadata>(dyn_cast<MDNode>(MI->getOperand(*idx).getMetadata())->getOperand(0))->getValue())->getSExtValue();
 	} else {
-		return None;
+		return std::nullopt;
 	}
 }
 
 bool EquivalenceClasses::dependentInstructions(
-		const MachineInstr* instr1,const MachineInstr* instr2,
-		std::map<unsigned, std::set<unsigned>> &class_dependencies
+ 		const MachineInstr* instr1,const MachineInstr* instr2,
+ 		std::map<unsigned, std::set<unsigned> > &class_dependencies
 ){
 	auto predicate_negated = [](const MachineInstr* instr){
 		if(instr->isPredicable()) {

@@ -34,6 +34,10 @@
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "PMLExport.h"
 
+#include "llvm/Analysis/LoopInfo.h" // See: https://llvm.org/docs/NewPassManager.html, it moved away from this at some point.
+#include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/Support/FileSystem.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "pml-export"
@@ -480,7 +484,8 @@ exportCallInstruction(MachineFunction &MF, yaml::MachineInstruction *I,
   for (std::vector<StringRef>::iterator it = Callees.begin(),ie = Callees.end();
        it != ie; ++it) {
 
-    auto *target = getMaybeAliasedFunction(*it, MF.getMMI().getModule());
+    // Change from LLVM 17 - See: https://github.com/llvm/llvm-project/issues/90542
+    auto *target = getMaybeAliasedFunction(*it, MF.getFunction().getParent());
 
     assert(target);
 

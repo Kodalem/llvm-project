@@ -16,7 +16,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/CodeGen/MachineFunction.h"
-#include "llvm/ADT/Optional.h"
+#include <optional> // https://llvm.org/docs/CodingStandards.html
 #include "llvm/CodeGen/MachineModuleInfo.h"
 
 using namespace llvm;
@@ -33,7 +33,7 @@ void llvm::getMBBIRName(const MachineBasicBlock *MBB,
   bb_ir_label.toVector(result);
 }
 
-Optional<std::pair<uint64_t, uint64_t>> llvm::getLoopBounds(const MachineBasicBlock * MBB) {
+std::optional<std::pair<uint64_t, uint64_t>> llvm::getLoopBounds(const MachineBasicBlock * MBB) {
   if(MBB && MBB->getBasicBlock()) {
     auto bound_instr = std::find_if(MBB->begin(), MBB->end(), [&](auto &instr){
       return instr.getOpcode() == Patmos::PSEUDO_LOOPBOUND;
@@ -55,7 +55,7 @@ Optional<std::pair<uint64_t, uint64_t>> llvm::getLoopBounds(const MachineBasicBl
       return std::make_pair((uint64_t) min, (uint64_t) max);
     }
   }
-  return None;
+  return std::nullopt;
 }
 
 Target &llvm::getThePatmosTarget() {
@@ -87,13 +87,14 @@ const Function *llvm::getCallTarget(const MachineInstr *MI) {
   return Target;
 }
 
-MachineFunction *llvm::getCallTargetMF(const MachineInstr *MI) {
+
+MachineFunction *llvm::getCallTargetMF(const MachineInstr *MI, MachineModuleInfo &MMI) {
   auto *F = getCallTarget(MI);
-  MachineFunction *MF;
-  if (F && (MF = &MI->getParent()->getParent()->getMMI().getOrCreateMachineFunction((Function&)*F))) {
-    return MF;
+  if (F) {
+    // getOrCreateMachineFunction is now accessed via the passed MMI reference
+    return &MMI.getOrCreateMachineFunction(const_cast<Function&>(*F));
   }
-  return NULL;
+  return nullptr;
 }
 
 bool llvm::isLoadInst(unsigned opcode) {

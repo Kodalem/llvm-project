@@ -22,13 +22,13 @@
 #include "PatmosRegisterInfo.h"
 #include "PatmosSubtarget.h"
 #include "llvm/IR/DataLayout.h"
-#include "llvm/Target/TargetMachine.h"
+#include "llvm/CodeGen/CodeGenTargetMachineImpl.h"
 
 namespace llvm {
 
 /// PatmosTargetMachine
 ///
-class PatmosTargetMachine : public LLVMTargetMachine {
+class PatmosTargetMachine : public CodeGenTargetMachineImpl {
   std::unique_ptr<TargetLoweringObjectFile> TLOF;
   PatmosSubtarget        Subtarget;
 public:

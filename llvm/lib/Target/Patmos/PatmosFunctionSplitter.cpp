@@ -60,35 +60,38 @@
 //#define PATMOS_TRACE_FIXUP
 //#define PATMOS_DUMP_ALL_SCC_DOTS
 
-
 #include "Patmos.h"
 #include "PatmosAsmPrinter.h"
 #include "PatmosInstrInfo.h"
 #include "PatmosMachineFunctionInfo.h"
 #include "PatmosSubtarget.h"
 #include "PatmosTargetMachine.h"
-#include "llvm/IR/Function.h"
 #include "llvm/ADT/GraphTraits.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineDominators.h"
-#include "llvm/CodeGen/MachinePostDominators.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineJumpTableInfo.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
+#include "llvm/CodeGen/MachinePostDominators.h"
+#include "llvm/CodeGen/TargetRegisterInfo.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCInstrDesc.h"
 #include "llvm/MC/MCSectionELF.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/DOTGraphTraits.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/GraphWriter.h"
-#include "llvm/Support/DOTGraphTraits.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Timer.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/CodeGen.h"
+#include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 
 #include <map>
@@ -1406,7 +1409,7 @@ namespace llvm {
 
         const TargetInstrInfo &TII = *MF->getSubtarget().getInstrInfo();
 
-        if (PTM.getCodeModel() != CodeModel::Large || block->Region == target->Region) {
+        if ((static_cast<const llvm::TargetMachine&>(PTM)).getCodeModel() != llvm::CodeModel::Large || block->Region == target->Region) {
           // Encode branch in a single instruction
           unsigned Opc = block->Region == target->Region ? Patmos::BRu : Patmos::BRCFu;
           AddDefaultPred(BuildMI(*fallthrough, fallthrough->instr_end(),
@@ -1563,12 +1566,12 @@ namespace llvm {
         // move to the beginning of the BR bundle
         while (II->isBundledWithPred()) II--;
 
-        if (PTM.getCodeModel() == CodeModel::Large) {
+        if ((static_cast<const llvm::TargetMachine&>(PTM)).getCodeModel() == llvm::CodeModel::Large) {
           // Load target into register when rewriting to BRCF with immediate
           if (opcode == Patmos::BRCF || opcode == Patmos::BRCFu) {
             AddDefaultPred(BuildMI(MBB, II, DebugLoc(), PII.get(Patmos::LIl), Patmos::RTR))
               .add(BR->getOperand(BR->getNumExplicitOperands()-1));
-            BR->RemoveOperand(BR->getNumExplicitOperands()-1);
+            BR->removeOperand(BR->getNumExplicitOperands()-1);
             BR->addOperand(*MF, MachineOperand::CreateReg(Patmos::RTR, false, false, true));
          
             opcode = opcode == Patmos::BRCF ? Patmos::BRCFR : Patmos::BRCFRu;
@@ -1859,17 +1862,17 @@ namespace llvm {
       // we already have a BR, we only need to add a NOP if we change to BRCF
       unsigned branch_fixups = numBranchesToFix * (exitDelay - localDelay) * 4;
 
-      // we have to load the address into a register when not using the small code model
-      if (PTM.getCodeModel() == CodeModel::Large) {
-        branch_fixups += numBranchesToFix * 8;
-      }
+       // we have to load the address into a register when not using the small code model
+       if ((static_cast<const llvm::TargetMachine&>(PTM)).getCodeModel() == llvm::CodeModel::Large) {
+         branch_fixups += numBranchesToFix * 8;
+       }
 
       if (mightFallthrough) {
         // we might need to add a BR/BRCF to replace the fallthrough, and NOPs
         // to fill the delay slots
 
         // BRCFs are cheaper in the small code model
-        unsigned brcfCost = PTM.getCodeModel() == CodeModel::Large ? 12 : 4;
+          unsigned brcfCost = (static_cast<const llvm::TargetMachine&>(PTM)).getCodeModel() == llvm::CodeModel::Large ? 12 : 4;
 
         // TODO this might be too conservative, as we might be able to move
         // branches up and do not need that many NOPs
@@ -1952,17 +1955,20 @@ namespace llvm {
         // we must not split live ranges of the RTR register
         // luckily, they are short and do not cross basic blocks
         unsigned int tmp_live_margin = 0;
-        if (PTM.getCodeModel() == CodeModel::Large &&
-            i->definesRegister(Patmos::RTR) && !i->isBranch()) {
-          MachineBasicBlock::instr_iterator k;
-          for (k = std::next(i); k != ie; ++k) {
-            tmp_live_margin += agraph::getInstrSize(&*k, PTM);
-            if (k->killsRegister(Patmos::RTR)) {
-              break;
+        if ((static_cast<const llvm::TargetMachine&>(PTM)).getCodeModel() == llvm::CodeModel::Large && !i->isBranch()) {
+          // get the TargetRegisterInfo from the current MachineFunction
+          const TargetRegisterInfo *TRI = MBB->getParent()->getSubtarget().getRegisterInfo();
+          if (i->definesRegister(Patmos::RTR, TRI)) {
+            MachineBasicBlock::instr_iterator k;
+            for (k = std::next(i); k != ie; ++k) {
+              tmp_live_margin += agraph::getInstrSize(&*k, PTM);
+              if (k->killsRegister(Patmos::RTR, TRI)) {
+                break;
+              }
             }
-          }
-          if (k == ie) {
-            report_fatal_error("Temporary register defined but not killed in basic block");
+            if (k == ie) {
+              report_fatal_error("Temporary register defined but not killed in basic block");
+            }
           }
         }
 
@@ -2021,13 +2027,13 @@ namespace llvm {
             // TODO Any other way to change the root node of the DomTree?
             //      At least do this after all other blocks are split, and skip
             //      updating the DomTree for individual blocks.
-            MDT.runOnMachineFunction(*MBB->getParent());
+            MDT.recalculate(*MBB->getParent());
           }
           // noreturn calls do not post-dominate and do not have a node in
           // the tree.
           if (MPDT.getNode(MBB)) {
             // - the new node is post-dominated by the old block
-            MPDT.getBase().addNewBlock(newBB, MBB);
+            MPDT.addNewBlock(newBB, MBB); // See: https://llvm.org/doxygen/classllvm_1_1MachinePostDominatorTree.html
             // - the new block post-dominates all nodes post-dominated by
             //   the old block
             for (MachineDomTreeNode::const_iterator
@@ -2036,7 +2042,7 @@ namespace llvm {
             {
               MachineBasicBlock *preBB = (*it)->getBlock();
               if (preBB == newBB) continue;
-              MPDT.getBase().changeImmediateDominator(preBB, newBB);
+              MPDT.changeImmediateDominator(preBB, newBB); // See: https://llvm.org/doxygen/classllvm_1_1MachinePostDominatorTree.html
               // restart from beginning, with one post-dominated node less.
               it = MPDT.getNode(MBB)->children().begin();
             }
@@ -2101,12 +2107,12 @@ namespace llvm {
                     unsigned orig_size, const TimeRecord &Time)
     {
       std::error_code err;
-      raw_fd_ostream f(Filename, err, sys::fs::F_Append);
+      raw_fd_ostream f(Filename, err, sys::fs::OF_Append); // See: https://llvm.org/doxygen/namespacellvm_1_1sys_1_1fs.html
 
       // write a single line per function
 
       // <module>, <function>, "fun", <#BBs>, <origSize>, <time (ms)>
-      f << "\"" << MF.getMMI().getModule()->getModuleIdentifier() << "\", ";
+      f << "\"" << MF.getFunction().getParent()->getModuleIdentifier() << "\", ";     // See: https://github.com/llvm/llvm-project/issues/90542
       f << "\"" << MF.getName() << "\", ";
       f << "\"fun\", ";
       f << MF.size() << ", " << orig_size << ", ";
@@ -2141,7 +2147,7 @@ namespace llvm {
           // write one line per region
 
           // <module>, <function>, "reg",
-          f << "\"" << MF.getMMI().getModule()->getModuleIdentifier() << "\", ";
+          f << "\"" << MF.getFunction().getParent()->getModuleIdentifier() << "\", "; // See: https://github.com/llvm/llvm-project/issues/90542
           f << "\"" << MF.getName() << "\", ";
           f << "\"reg\", ";
 
@@ -2180,10 +2186,12 @@ namespace llvm {
     }
 
     void getAnalysisUsage(AnalysisUsage &AU) const override {
-      AU.addRequired<MachineDominatorTree>();
-      AU.addRequired<MachinePostDominatorTree>();
-      AU.addPreserved<MachineDominatorTree>();
-      AU.addPreserved<MachinePostDominatorTree>();
+      // Use WrapperPass classes for legacy pass manager registration
+      AU.addRequired<MachineDominatorTreeWrapperPass>();
+      AU.addRequired<MachinePostDominatorTreeWrapperPass>();
+      AU.addPreserved<MachineDominatorTreeWrapperPass>();
+      AU.addPreserved<MachinePostDominatorTreeWrapperPass>();
+
       MachineFunctionPass::getAnalysisUsage(AU);
     }
 
@@ -2230,8 +2238,10 @@ namespace llvm {
       unsigned total_size = 0;
       bool blocks_splitted = false;
 
-      MachineDominatorTree &MDT = getAnalysis<MachineDominatorTree>();
-      MachinePostDominatorTree &MPDT = getAnalysis<MachinePostDominatorTree>();
+      auto &MDTWrapper = getAnalysis<MachineDominatorTreeWrapperPass>();
+      auto &MPDTWrapper = getAnalysis<MachinePostDominatorTreeWrapperPass>();
+      MachineDominatorTree &MDT = MDTWrapper.getDomTree();
+      MachinePostDominatorTree &MPDT = MPDTWrapper.getPostDomTree();
 
       for(MachineFunction::iterator i(MF.begin()), ie(MF.end()); i != ie; i++) {
         unsigned bb_size = agraph::getBBSize(&*i, PTM);

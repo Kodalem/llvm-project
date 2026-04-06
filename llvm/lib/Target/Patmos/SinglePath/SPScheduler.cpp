@@ -18,6 +18,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include <sstream>
+#include <optional>
 
 
 using namespace llvm;
@@ -175,11 +176,11 @@ std::set<Register> writes(const MachineInstr *instr){
   return result;
 }
 
-Optional<Register> uses_predicate(const MachineInstr *instr){
-  Optional<Register> result;
+std::optional<Register> uses_predicate(const MachineInstr *instr){
+  std::optional<Register> result;
 
   if(instr->isPredicable()) {
-  	result = instr->getOperand(instr->findFirstPredOperandIdx()).getReg();
+    result = instr->getOperand(instr->findFirstPredOperandIdx()).getReg();
   }
 
   return result;
@@ -423,7 +424,7 @@ void SPScheduler::runListSchedule(MachineBasicBlock *mbb) {
   // so if it's there, move it to the end of the instruction list
   // so its skipped
   auto found_loopbound = std::find_if(mbb->instr_begin(), mbb->instr_end(), [&](auto &instr) {
-    return instr.getOpcode() == Patmos::PSEUDO_LOOPBOUND;
+    return instr.getOpcode() == Patmos::PSEUDO_LOOPBOUND; // Note: [001A] Ask Emad
   });
   bool was_loopbound = false;
   if (found_loopbound != mbb->instr_end()) {
@@ -472,7 +473,7 @@ void SPScheduler::runListSchedule(MachineBasicBlock *mbb) {
 
   auto last_to_schedule = std::next(mbb->instr_begin(),schedule_count);
 
-  llvm::Optional<std::tuple<
+  std::optional<std::tuple<
     const PatmosInstrInfo *,
     bool (*)(const PatmosInstrInfo *, const MachineInstr *),
     bool (*)(const MachineInstr *),
@@ -484,7 +485,7 @@ void SPScheduler::runListSchedule(MachineBasicBlock *mbb) {
     enable_dual_issue = std::make_tuple(TM.getSubtargetImpl()->getInstrInfo(), may_second_slot, is_long, may_bundle);
   } else {
     // disable dual-issue
-    enable_dual_issue = None;
+    enable_dual_issue = std::nullopt;
   }
 
 

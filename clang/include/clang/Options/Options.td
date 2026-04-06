@@ -5821,11 +5821,11 @@ def mrecip_EQ : CommaJoined<["-"], "mrecip=">, Group<m_Group>,
            "Newton-Raphson refinement. "
            "<value> = ( ['!'] ['vec-'] ('rcp'|'sqrt') [('h'|'s'|'d')] [':'<n>] ) | 'all' | 'default' | 'none'">,
   MarshallingInfoStringVector<CodeGenOpts<"Reciprocals">>;
-def mserialize_pml : Joined<["-"], "mserialize-pml=">, Group<m_Group>, Flags<[CC1Option]>,
+def mserialize_pml : Joined<["-"], "mserialize-pml=">, Group<m_Group>, Visibility<[CC1Option]>,
   MarshallingInfoString<CodeGenOpts<"SerializePmlPath">>, HelpText<"Serialize assembly into .pml file for WCET analysis with Platin.">;
-def mpatmos_enable_cet : Flag<["-"], "mpatmos-enable-cet">, Group<m_Group>, Flags<[CC1Option]>,
+def mpatmos_enable_cet : Flag<["-"], "mpatmos-enable-cet">, Group<m_Group>, Visibility<[CC1Option]>,
   MarshallingInfoFlag<CodeGenOpts<"PatmosEnableCet">>, HelpText<"Enable constant execution time code generation.">;
-def mpatmos_cet_functions : CommaJoined<["-"], "mpatmos-cet-functions=">, Group<m_Group>, Flags<[CC1Option]>,
+def mpatmos_cet_functions : CommaJoined<["-"], "mpatmos-cet-functions=">, Group<m_Group>, Visibility<[CC1Option]>,
   MarshallingInfoStringVector<CodeGenOpts<"PatmosCetFuncs">>, HelpText<"Functions that should use constant execution time code generation. Requires -mpatmos-enable-cet to have an effect.">;
 def mprefer_vector_width_EQ : Joined<["-"], "mprefer-vector-width=">, Group<m_Group>,
   Visibility<[ClangOption, CC1Option, FlangOption, FC1Option]>,

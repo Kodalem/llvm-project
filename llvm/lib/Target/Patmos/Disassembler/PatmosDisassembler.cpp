@@ -16,7 +16,7 @@
 #include "MCTargetDesc/PatmosBaseInfo.h"
 #include "TargetInfo/PatmosTargetInfo.h"
 #include "llvm/MC/MCDisassembler/MCDisassembler.h"
-#include "llvm/MC/MCFixedLenDisassembler.h"
+#include "llvm/MC/MCDecoderOps.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCInst.h"
@@ -25,6 +25,7 @@
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/Support/MathExtras.h"
 
+// Todo: Implement Full MCDiagnostic support
 
 using namespace llvm;
 
@@ -96,7 +97,12 @@ static DecodeStatus DecodePRegsRegisterClass(MCInst &Inst, unsigned RegNo, uint6
 static DecodeStatus DecodePredRegisterClass(MCInst &Inst, unsigned RegNo, uint64_t Address,
                                             const void *Decoder);
 
+// Messy, but I don't want to break the system
+#if __has_include("PatmosGenDisassemblerTables.inc")
 #include "PatmosGenDisassemblerTables.inc"
+#elif __has_include("PatmosGenDisassembler.inc")
+#include "PatmosGenDisassembler.inc"
+#endif
 
 /// readInstruction - read four bytes from the MemoryObject
 /// The given size is where in the input to start reading and will

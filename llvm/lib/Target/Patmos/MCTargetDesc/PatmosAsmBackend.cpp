@@ -20,7 +20,7 @@
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCDirectives.h"
 #include "llvm/MC/MCELFObjectWriter.h"
-#include "llvm/MC/MCFixupKindInfo.h"
+#include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCTargetOptions.h"
@@ -61,14 +61,11 @@ PatmosAsmBackend::createObjectTargetWriter() const {
   return createPatmosELFObjectWriter(TheTriple);
 }
 
-/// ApplyFixup - Apply the \p Value for given \p Fixup into the provided
-/// data fragment, at the offset specified by the fixup and following the
-/// fixup kind as appropriate.
-void PatmosAsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
-                                const MCValue &Target,
-                                MutableArrayRef<char> Data, uint64_t Value,
-                                bool IsResolved,
-                                const MCSubtargetInfo *STI) const {
+// ApplyFixup - Apply the Value for given Fixup into the provided data fragment,
+// at the offset specified by the fixup and following the fixup kind as appropriate.
+void PatmosAsmBackend::applyFixup(const MCFragment &Fragment, const MCFixup &Fixup,
+                                  const MCValue &Target, uint8_t *Data,
+                                  uint64_t Value, bool IsResolved) {
   MCFixupKind Kind = Fixup.getKind();
   Value = adjustFixupValue(Fixup, Value);
 
@@ -104,9 +101,8 @@ void PatmosAsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
     }
 }
 
-const MCFixupKindInfo &PatmosAsmBackend::
-getFixupKindInfo(MCFixupKind Kind) const {
-  const static MCFixupKindInfo Infos[Patmos::NumTargetFixupKinds] = {
+MCFixupKindInfo PatmosAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
+  static const MCFixupKindInfo Infos[Patmos::NumTargetFixupKinds] = {
     // This table *must* be in same the order of FK_* kinds in
     // PatmosFixupKinds.h.
     //
@@ -118,14 +114,18 @@ getFixupKindInfo(MCFixupKind Kind) const {
     { "FK_Patmos_abs_CFLi",    10,     22,   0 }, // 2 bit shifted, unsigned, for call
     { "FK_Patmos_abs_ALUl",    32,     32,   0 }, // ALU immediate, unsigned
     { "FK_Patmos_stc",         14,     18,   0 }, // 2 bit shifted, unsigned, for stack control
-    { "FK_Patmos_PCrel",       10,     22,   MCFixupKindInfo::FKF_IsPCRel }, // 2 bit shifted, signed, PC relative
+    // Modern LLVM tracks PC-relativity on the MCFixup itself (Fixup.isPCRel()),
+    // so the Flags field in MCFixupKindInfo does not define FKF_IsPCRel anymore.
+    // Use 0 here for the flags field... I hope...
+    { "FK_Patmos_PCrel",       10,     22,   0 }, // 2 bit shifted, signed, PC relative
   };
 
   if (Kind < FirstTargetFixupKind)
     return MCAsmBackend::getFixupKindInfo(Kind);
 
-  assert(unsigned(Kind - FirstTargetFixupKind) < getNumFixupKinds() &&
+  assert(unsigned(Kind - FirstTargetFixupKind) < Patmos::NumTargetFixupKinds &&
          "Invalid kind!");
+
   return Infos[Kind - FirstTargetFixupKind];
 }
 
@@ -148,7 +148,7 @@ bool PatmosAsmBackend::writeNopData(raw_ostream &OS, uint64_t Count, const MCSub
 
   for (uint64_t i = 0; i < Count; i += 4)
     // "(p0) sub r0 = r0, 0"
-    support::endian::write<uint32_t>(OS, 0x00400000, support::big);
+    support::endian::write<uint32_t>(OS, 0x00400000, llvm::endianness::big);
 
   return true;
 }

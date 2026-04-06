@@ -17,6 +17,8 @@
 #include "Patmos.h"
 #include "PatmosSubtarget.h"
 #include "llvm/CodeGen/TargetFrameLowering.h"
+#include "llvm/Support/Alignment.h"
+#include "PatmosGenRegisterInfo.inc"
 
 namespace llvm {
 class PatmosFrameLowering : public TargetFrameLowering {
@@ -69,7 +71,7 @@ protected:
   void patchCallSites(MachineFunction &MF) const;
 public:
   explicit PatmosFrameLowering(const PatmosTargetMachine &TM, const PatmosSubtarget &sti, const DataLayout* DL)
-        : TargetFrameLowering(StackGrowsDown, DL->getStackAlignment(), 0), TM(TM), STC(sti) {
+        : TargetFrameLowering(StackGrowsDown, DL->getStackAlignment().valueOrOne(), 0), TM(TM), STC(sti) {
     }
 
   /// emitProlog/emitEpilog - These methods insert prolog and epilog code into
@@ -79,14 +81,15 @@ public:
   void emitEpilogue(MachineFunction &MF,
                     MachineBasicBlock &MBB) const override;
 
-  bool hasFP(const MachineFunction &MF) const override;
+  // See: https://www.llvm.org/doxygen/BPFFrameLowering_8h_source.html implementation
+  bool hasFPImpl(const MachineFunction &MF) const override;
 
   void determineCalleeSaves(MachineFunction &MF, BitVector &SavedRegs,
                             RegScavenger *RS) const override;
   bool spillCalleeSavedRegisters(MachineBasicBlock &MBB,
                                  MachineBasicBlock::iterator MI,
                                  ArrayRef<CalleeSavedInfo> CSI,
-                                 const TargetRegisterInfo *TRI) const override;
+                                 Register TRI) const override;
   bool restoreCalleeSavedRegisters(MachineBasicBlock &MBB,
                                    MachineBasicBlock::iterator MI,
                                    MutableArrayRef<CalleeSavedInfo> CSI,

@@ -260,7 +260,7 @@ public:
   virtual bool spillCalleeSavedRegisters(MachineBasicBlock &MBB,
                                          MachineBasicBlock::iterator MI,
                                          ArrayRef<CalleeSavedInfo> CSI,
-                                         const TargetRegisterInfo *TRI) const {
+                                         Register TRI) const {
     return false;
   }
 

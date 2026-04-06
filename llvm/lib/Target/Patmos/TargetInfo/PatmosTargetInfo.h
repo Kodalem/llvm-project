@@ -12,6 +12,8 @@
 #include "llvm/IR/Function.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/ADT/SmallString.h"
+#include <optional>
+#include <utility>
 
 namespace llvm {
 
@@ -31,11 +33,12 @@ void getMBBIRName(const MachineBasicBlock *MBB,
 ///
 /// The first element is the minimum iteration count.
 /// The second element is the maximum iteration count.
-Optional<std::pair<uint64_t, uint64_t>> getLoopBounds(const MachineBasicBlock * MBB);
+std::optional<std::pair<uint64_t, uint64_t>> getLoopBounds(const MachineBasicBlock * MBB);
 
 const Function *getCallTarget(const MachineInstr *MI);
 
-MachineFunction *getCallTargetMF(const MachineInstr *MI);
+MachineFunction *getCallTargetMF(const MachineInstr *MI,
+                                 MachineModuleInfo &MMI);
 
 /// Returns true if the given opcode represents a load instruction that may touch main-memory.
 bool isMainMemLoadInst(unsigned opcode);

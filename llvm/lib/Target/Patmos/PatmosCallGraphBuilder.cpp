@@ -12,13 +12,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "PatmosCallGraphBuilder.h"
-#include "llvm/IR/Module.h"
-#include "llvm/CodeGen/MachineMemOperand.h"
-#include "llvm/ADT/SCCIterator.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
 
 #include <set>
+
+#include "llvm/ADT/SCCIterator.h"
+#include "llvm/CodeGen/MachineMemOperand.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 
@@ -92,12 +93,28 @@ namespace llvm {
 
   static bool isEmptyStructPointer(Type *Ty)
   {
-    if (PointerType *PTy = Ty ? dyn_cast<PointerType>(Ty) : NULL) {
-      if (StructType *STy = dyn_cast<StructType>(PTy->getElementType())) {
-        return (STy->getNumContainedTypes() == 0);
-      }
-    }
+    // LLVM 15+ onwards, the getElementType has been replaced with Opaque Pointers
+    // https://matthewbdwyer.github.io/tipc/md_OpaquePointers.html
+    // https://rocm.docs.amd.com/projects/llvm-project/en/latest/LLVM/llvm/html/OpaquePointers.html
+    // https://discourse.llvm.org/t/making-clang-work-with-opaque-pointers/58598
 
+    // In opaque-pointers mode the PointerType no longer exposes the pointee
+    // element. Without access to the Value/Instruction that produced this
+    // type we cannot reliably recover the pointee type here. Therefore,
+    // conservatively treat only a direct StructType as an empty-struct
+    // indicator. Callers that have instruction-level context should inspect
+    // the instruction (e.g. LoadInst/GetElementPtrInst/AllocaInst) to obtain
+    // the element type.
+    if (!Ty)
+      return false;
+
+    if (StructType *STy = dyn_cast<StructType>(Ty))
+      return (STy->getNumContainedTypes() == 0);
+
+    // For pointers and other types we cannot determine the element type here
+    // in opaque-pointers mode; be conservative and return false. Code paths
+    // that have access to values should query the instruction/value for the
+    // pointee type instead.
     return false;
   }
 
@@ -181,7 +198,9 @@ namespace llvm {
       if (DATy->getNumElements() != cast<ArrayType>(SrcTy)->getNumElements())
         return 0;
     } else if (VectorType *DVTy = dyn_cast<VectorType>(DstTy)) {
-      if (DVTy->getNumElements() != cast<ArrayType>(SrcTy)->getNumElements())
+      // Compare element counts for vectors. Use VectorType::getElementCount
+      // which returns an ElementCount, and cast SrcTy to VectorType.
+      if (DVTy->getElementCount() != cast<VectorType>(SrcTy)->getElementCount())
         return 0;
     }
 
@@ -438,11 +457,11 @@ namespace llvm {
           }
 
           // does a MachineFunction exist for F?
-          MachineFunction *MF = F ? MMI.getMachineFunction(*F) : NULL;
+          MachineFunction *TargetMF = F ? MMI.getMachineFunction(*F) : NULL;
 
           // construct a new call site
           MCG.makeMCGSite(MCGN, &*j,
-                          MF ? MCG.makeMCGNode(MF) : MCG.getUnknownNode(T));
+                          TargetMF ? MCG.makeMCGNode(TargetMF) : MCG.getUnknownNode(T));
         }
       }
     }
@@ -534,7 +553,7 @@ namespace llvm {
 
     return false;
   }
-}
+} // namespace llvm
 
 /// createPatmosCallGraphBuilder - Returns a new PatmosCallGraphBuilder.
 ModulePass *llvm::createPatmosCallGraphBuilder() {

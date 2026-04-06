@@ -182,7 +182,7 @@ bool PatmosSPMark::runOnModule(Module &M) {
 
 MachineFunction *
 PatmosSPMark::getCallTargetMFOrAbort(MachineBasicBlock::iterator MI, MachineFunction::iterator MBB){
-  MachineFunction *MF = getCallTargetMF(&*MI);
+  MachineFunction *MF = getCallTargetMF(&*MI, TODO);
   if (!MF) {
     errs() << "[Single-path] Cannot find ";
     bool foundSymbol = false;
@@ -235,7 +235,7 @@ void PatmosSPMark::scanAndRewriteCalls(MachineFunction *MF, Worklist &W) {
         }
         rewriteCall(&*MI, pseudo_target);
 
-        auto *new_target_MF = getCallTargetMF(&*MI);
+        auto *new_target_MF = getCallTargetMF(&*MI, TODO);
         auto *new_PMFI =
             new_target_MF->getInfo<PatmosMachineFunctionInfo>();
         // we possibly have already marked the _sp variant as single-path

@@ -13,7 +13,6 @@
 #include "Patmos.h"
 #include "clang/Basic/MacroBuilder.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/TargetParser.h"
 
 using namespace clang;
 using namespace clang::targets;
@@ -34,7 +33,7 @@ ArrayRef<const char *> PatmosTargetInfo::getGCCRegNames() const {
       "s0",  "sm",  "sl",  "sh",  "s4",  "ss",  "st",  "s7",
       "s8",  "s9",  "s10", "s11", "s12", "s13", "s14", "s15"
   };
-  return llvm::makeArrayRef(GCCRegNames);
+  return llvm::ArrayRef(GCCRegNames);
 }
 
 ArrayRef<TargetInfo::GCCRegAlias> PatmosTargetInfo::getGCCRegAliases() const {
@@ -50,7 +49,7 @@ ArrayRef<TargetInfo::GCCRegAlias> PatmosTargetInfo::getGCCRegAliases() const {
       { { "s5"  }, "ss"  },
       { { "s6"  }, "st"  }
   };
-  return llvm::makeArrayRef(GCCRegAliases);
+  return llvm::ArrayRef(GCCRegAliases);
 }
 
 bool PatmosTargetInfo::validateAsmConstraint(

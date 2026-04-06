@@ -93,7 +93,10 @@ bool VirtualizePredicates::runOnMachineFunction(MachineFunction &MF) {
 /// and that if the function is called disabled, a loops counter doesn't overwrite
 /// caller's register (which they didn't spill since the paths is disabled).
 void VirtualizePredicates::unpredicateCounterSpillReload(MachineFunction &MF) {
-	auto &LI = getAnalysis<MachineLoopInfo>();
+	// MachineLoopInfo is provided via the MachineLoopInfoWrapperPass in the
+	// legacy pass manager. Request the wrapper and access the MachineLoopInfo
+	// instance through getLI().
+	auto &LI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
 
 	// registers used for loop counter management and their loop
 	std::set<std::pair<Register, MachineLoop*>> counter_mgmt_regs;
@@ -204,8 +207,10 @@ void VirtualizePredicates::unpredicateCounterSpillReload(MachineFunction &MF) {
 		}
 	}
 
-	ReachingDefAnalysis RD;
-	RD.runOnMachineFunction(MF);
+	// Use the wrapper pass to get the ReachingDefInfo (RDI). The analysis
+	// implementation lives in ReachingDefInfo; the wrapper exposes it to the
+	// legacy pass manager.
+	auto &RD = getAnalysis<ReachingDefInfoWrapperPass>().getRDI();
 	PostDomTreeBase<MachineBasicBlock> PDT;
 	PDT.recalculate(MF);
 	std::set<std::pair<Register, MachineLoop*>> solved_counters;

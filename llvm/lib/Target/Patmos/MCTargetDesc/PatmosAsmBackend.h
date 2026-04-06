@@ -15,8 +15,9 @@
 #define LLVM_LIB_TARGET_PATMOS_MCTARGETDESC_PATMOSASMBACKEND_H
 
 #include "MCTargetDesc/PatmosFixupKinds.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/MC/MCAsmBackend.h"
+#include "llvm/Support/Endian.h"
 
 namespace llvm {
 
@@ -31,21 +32,15 @@ class PatmosAsmBackend : public MCAsmBackend {
 public:
   PatmosAsmBackend(const Target &T, const MCRegisterInfo &MRI, const Triple &TT,
                    StringRef CPU)
-      : MCAsmBackend(support::big), TheTriple(TT) {}
+      : MCAsmBackend(llvm::endianness::big), TheTriple(TT) {}
 
   std::unique_ptr<MCObjectTargetWriter>
   createObjectTargetWriter() const override;
 
-  void applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
-                  const MCValue &Target, MutableArrayRef<char> Data,
-                  uint64_t Value, bool IsResolved,
-                  const MCSubtargetInfo *STI) const override;
+  void applyFixup(const MCFragment &, const MCFixup &, const MCValue &Target,
+                  uint8_t *Data, uint64_t Value, bool IsResolved) override;
 
-  const MCFixupKindInfo &getFixupKindInfo(MCFixupKind Kind) const override;
-
-  unsigned getNumFixupKinds() const override {
-    return Patmos::NumTargetFixupKinds;
-  }
+  MCFixupKindInfo getFixupKindInfo(MCFixupKind Kind) const override;
 
   /// @name Target Relaxation Interfaces
   /// @{
@@ -54,17 +49,19 @@ public:
   /// relaxation.
   ///
   /// \param Inst - The instruction to test.
-  bool mayNeedRelaxation(const MCInst &Inst,
-                         const MCSubtargetInfo &STI) const override {
+  bool mayNeedRelaxation(unsigned Opcode, ArrayRef<MCOperand> Operands,
+                       const MCSubtargetInfo &STI) const override {
     // TODO return true for small immediates (?)
     return false;
   }
 
+
+
   /// fixupNeedsRelaxation - Target specific predicate for whether a given
   /// fixup requires the associated instruction to be relaxed.
-  bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
-                            const MCRelaxableFragment *DF,
-                            const MCAsmLayout &Layout) const override {
+  bool fixupNeedsRelaxationAdvanced(const MCFragment &, const MCFixup &,
+                                    const MCValue &, uint64_t,
+                                    bool) const override {
     // FIXME.
     llvm_unreachable("RelaxInstruction() unimplemented");
     return false;

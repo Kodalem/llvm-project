@@ -78,9 +78,8 @@ static MCInstPrinter *createPatmosMCInstPrinter(const Triple &T,
 }
 
 static MCTargetStreamer *createPatmosAsmTargetStreamer(MCStreamer &S,
-                                                       llvm::formatted_raw_ostream &OS,
-                                                       MCInstPrinter *InstPrint,
-                                                       bool isVerboseAsm) {
+                                                       formatted_raw_ostream &OS,
+                                                       MCInstPrinter *InstPrint) {
   return new PatmosTargetAsmStreamer(S, OS);
 }
 

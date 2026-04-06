@@ -69,3 +69,7 @@ def Patmos : Target {
   let AssemblyWriters = [PatmosInstPrinter];
 }
 
+// Remap pointer-like pseudo operands to a concrete register class for
+// TableGen, to satisfy Target.td's PointerLikeRegClass requirements.
+// This tells TableGen to replace pointer-like operands with RRegs.
+defm : RemapAllTargetPseudoPointerOperands<RRegs>;

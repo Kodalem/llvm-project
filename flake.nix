@@ -16,6 +16,8 @@
           gcc
           binutils
           python3
+          pkg-config
+          libxml2
         ] ++ pkgs.lib.optional (system == "x86_64-darwin") pkgs.darwin.cctools;
       in {
         packages = let

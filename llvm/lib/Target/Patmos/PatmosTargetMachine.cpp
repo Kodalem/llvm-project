@@ -356,6 +356,13 @@ PatmosTargetMachine::PatmosTargetMachine(const Target &T,
       TT, CPU, FS, Options, getEffectiveRelocModel(JIT, RM), getEffectiveCodeModel(CM, CodeModel::Small), L),
     Subtarget(TT, CPU, FS, *this, L), TLOF(std::make_unique<PatmosTargetObjectFile>())
 {
+  // Ensure temporary labels are preserved for later passes that rely on
+  // creating and referring to temporary labels in assembly. Set this in the
+  // TargetMachine during construction rather than from the AsmPrinter, since
+  // the Options member is protected in the base TargetMachine class and
+  // should be configured at creation time.
+  this->Options.MCOptions.MCSaveTempLabels = true;
+
   initAsmInfo();
 }
 

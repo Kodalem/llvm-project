@@ -13,8 +13,8 @@
 
 #include "Patmos.h"
 #include "PatmosMachineFunctionInfo.h"
-#include "PatmosTargetMachine.h"
 #include "PatmosSubtarget.h"
+#include "PatmosTargetMachine.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/Support/CommandLine.h"

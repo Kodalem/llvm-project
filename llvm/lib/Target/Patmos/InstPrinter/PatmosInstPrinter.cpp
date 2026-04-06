@@ -24,6 +24,8 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/Format.h"
+#include "llvm/MC/MCExpr.h"
+
 using namespace llvm;
 
 
@@ -122,7 +124,7 @@ void PatmosInstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
     }
   } else {
     assert(Op.isExpr() && "unknown operand kind in printOperand");
-    O << *Op.getExpr();
+    MAI.printExpr(O, *Op.getExpr());
   }
 }
 
@@ -181,7 +183,7 @@ void PatmosInstPrinter::printPCRelTargetOperand(const MCInst *MI,
 
   assert(Op.isExpr() && "unknown operand kind in printCacheRelTargetOperand");
 
-  O << *Op.getExpr();
+  MAI.printExpr(O, *Op.getExpr());
 }
 
 void PatmosInstPrinter::printRegisterName(unsigned RegNo, raw_ostream &O) {

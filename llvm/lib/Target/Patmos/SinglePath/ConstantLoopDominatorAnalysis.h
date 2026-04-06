@@ -5,6 +5,7 @@
 #include <set>
 #include <map>
 #include <queue>
+#include <optional>
 
 #define DEBUG_TYPE "patmos-singlepath"
 
@@ -203,7 +204,7 @@ template<
 	typename MachineBasicBlock,
 	typename MachineLoopInfo
 >
-static Optional<const MachineBasicBlock*> get_outermost_header_in_parent(
+static std::optional<const MachineBasicBlock*> get_outermost_header_in_parent(
 		const MachineBasicBlock *block,
 		const MachineBasicBlock *parent_loop_header,
 		const MachineLoopInfo &LI
@@ -211,7 +212,7 @@ static Optional<const MachineBasicBlock*> get_outermost_header_in_parent(
 	auto parent_loop = LI->getLoopFor(parent_loop_header);
 	auto loop = LI->getLoopFor(block);
 	if(loop == parent_loop || !loop || loop->contains(parent_loop_header)) {
-		return None;
+		return std::nullopt;
 	}
 	assert(!parent_loop || parent_loop->contains(block));
 
@@ -426,7 +427,7 @@ constantLoopDominatorsAnalysisImpl(
 			dbgs() << "]\n"
 		);
 
-		Optional<std::set<const MachineBasicBlock*>> pred_doms_intersect;
+                std::optional<std::set<const MachineBasicBlock*>> pred_doms_intersect;
 		for (auto pred : fcfg_predecessors(current, start_mbb, LI)) {
 			assert(dominators.count(pred) && "Predecessor hasn't been handled");
 
@@ -492,7 +493,7 @@ constantLoopDominatorsAnalysisImpl(
 		});
 	}
 
-	Optional<std::set<const MachineBasicBlock*>> unilatch_doms;
+        std::optional<std::set<const MachineBasicBlock*>> unilatch_doms;
 	if(current_loop){
 		SmallVector<MachineBasicBlock*> latches;
 		current_loop->getLoopLatches(latches);

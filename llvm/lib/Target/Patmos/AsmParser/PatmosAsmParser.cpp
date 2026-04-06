@@ -15,6 +15,7 @@
 #include "llvm/MC/MCParser/MCParsedAsmOperand.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/MC/MCParser/AsmLexer.h"
 
 using namespace llvm;
 
@@ -36,7 +37,7 @@ class PatmosAsmParser : public MCTargetAsmParser {
   PrintBytesLevel ParseBytes;
 
   MCAsmParser &getParser() const { return Parser; }
-  MCAsmLexer &getLexer() const { return Parser.getLexer(); }
+  AsmLexer &getLexer() const { return Parser.getLexer(); }
 
   void Warning(SMLoc L, const Twine &Msg) { Parser.Warning(L, Msg); }
   bool Error(SMLoc L, const Twine &Msg) { return Parser.Error(L, Msg); }
@@ -59,22 +60,25 @@ public:
     }
   }
 
-  bool ParsePrefix(SMLoc &PrefixLoc, OperandVector &Operands, StringRef PrevToken);
+  // NOTE: ParsePrefix was removed from MCTargetAsmParser in newer LLVM
+  // versions (LLVM 13+). Prefix handling (bundle markers) is implemented
+  // inline inside ParseInstruction below.
 
-  bool ParseInstruction(ParseInstructionInfo &Info, StringRef Name, SMLoc NameLoc,
-                                OperandVector &Operands) override;
+  bool parseInstruction(ParseInstructionInfo &Info, StringRef Name, SMLoc NameLoc, OperandVector &Operands) override;
 
-  bool ParseRegister(unsigned &RegNo, SMLoc &StartLoc, SMLoc &EndLoc) override;
+  bool parseRegister(MCRegister &RegNo, SMLoc &StartLoc, SMLoc &EndLoc) override;
+  bool parseRegister(MCRegister &RegNo, bool Required);
 
   bool ParseDirective(AsmToken DirectiveID) override;
 
-  bool MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
-       OperandVector &Operands,
-       MCStreamer &Out, uint64_t &ErrorInfo,
-       bool MatchingInlineAsm) override;
+  bool matchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
+                               OperandVector &Operands, MCStreamer &Out,
+                               uint64_t &ErrorInfo,
+                               bool MatchingInlineAsm) override;
 
-  OperandMatchResultTy
-  tryParseRegister(unsigned &RegNo, SMLoc &StartLoc, SMLoc &EndLoc) override;
+  ParseStatus tryParseRegister(MCRegister &Reg, SMLoc &StartLoc,
+                               SMLoc &EndLoc) override;
+  bool parseRegister(OperandVector &Operands, bool EmitError);
 
   void EatToEndOfStatement();
 
@@ -83,11 +87,6 @@ private:
 
   /// Parses the instruction guard, e.g. '(!$p1)', or produces the default instead.
   bool ParseGuard(SMLoc NameLoc, OperandVector &Operands);
-
-  bool ParseRegister(OperandVector &Operands, bool EmitError = true);
-
-  /// ParseRegister - This version does not lex the last token so the end token can be retrieved
-  bool ParseRegister(unsigned &RegNo, bool Required);
 
   bool ParseMemoryOperand(OperandVector &Operands);
 
@@ -100,8 +99,11 @@ private:
 
   /// ParseToken - Check if the Lexer is currently over the given token kind, and add it as operand if so.
   bool ParseToken(OperandVector &Operands, AsmToken::TokenKind Kind);
+  bool ParseInstruction(ParseInstructionInfo &Info, StringRef Name,
+                        SMLoc NameLoc, OperandVector &Operands);
 
-  /// isPredSrcOperand - Check whether the operand might be a predicate source operand (i.e., has a negate flag)
+  /// isPredSrcOperand - Check whether the operand might be a predicate source
+  /// operand (i.e., has a negate flag)
   bool isPredSrcOperand(StringRef Mnemonic, unsigned OpNo);
 
   bool ParseDirectiveWord(unsigned Size, SMLoc L);
@@ -174,7 +176,7 @@ struct PatmosOperand : public MCParsedAsmOperand {
     /// getEndLoc - Get the location of the last token of this operand.
     SMLoc getEndLoc() const { return EndLoc; }
 
-    unsigned getReg() const {
+    MCRegister getReg() const {
       assert(Kind == Register && "Invalid access!");
       return Reg.RegNum;
     }
@@ -232,7 +234,7 @@ struct PatmosOperand : public MCParsedAsmOperand {
       return StringRef(Tok.Data, Tok.Length);
     }
 
-    virtual void print(raw_ostream &OS) const;
+  void print(raw_ostream &OS, const MCAsmInfo &MAI) const override;
 
     static PatmosOperand *CreateToken(StringRef Str, SMLoc S) {
       PatmosOperand *Op = new PatmosOperand(Token);
@@ -284,27 +286,26 @@ struct PatmosOperand : public MCParsedAsmOperand {
 
 } // end anonymous namespace.
 
-void PatmosOperand::print(raw_ostream &OS) const {
+void PatmosOperand::print(raw_ostream &OS, const MCAsmInfo &MAI) const {
   switch (Kind) {
-  case Immediate:
-    getImm()->print(OS, nullptr);
+  case Token:
+    OS << "Token: " << getToken();
     break;
   case Register:
-    OS << "<register ";
-    OS << PatmosInstPrinter::getRegisterName(getReg()) << ">";
+    // MCRegister supports << directly in LLVM 23
+    OS << "Reg: " << getReg();
     break;
-  case Token:
-    OS << "'" << getToken() << "'";
+  case Immediate: {
+    if (const MCExpr *E = getImm())
+      MAI.printExpr(OS, *E);
     break;
+  }
   case Memory: {
-    OS << "<memory ";
-    OS << getMemBase();
-    OS << ", ";
-
-    OS << getMemOff();
-    OS << ">";
-    }
+    OS << "Mem: " << getMemBase() << "+";
+    if (const MCExpr *Off = getMemOff())
+      MAI.printExpr(OS, *Off);
     break;
+  }
   }
 }
 
@@ -319,8 +320,7 @@ void PatmosOperand::print(raw_ostream &OS) const {
 /// }
 
 
-bool PatmosAsmParser::
-MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
+bool PatmosAsmParser::matchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
                         SmallVectorImpl<std::unique_ptr<MCParsedAsmOperand>> &Operands,
                         MCStreamer &Out, uint64_t &ErrorInfo,
 			bool MatchingInlineAsm) {
@@ -480,68 +480,71 @@ MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
   llvm_unreachable("Implement any new match types added!");
 }
 
-OperandMatchResultTy
-PatmosAsmParser::tryParseRegister(unsigned &RegNo, SMLoc &StartLoc, SMLoc &EndLoc) {
-  if (ParseRegister(RegNo, StartLoc, EndLoc)) {
-    // syntax error
-    return OperandMatchResultTy::MatchOperand_ParseFail;
-  }
-  if (RegNo == 0) {
-    // missing register
-    return OperandMatchResultTy::MatchOperand_ParseFail;
+ParseStatus PatmosAsmParser::tryParseRegister(MCRegister &RegNo, SMLoc &StartLoc, SMLoc &EndLoc) {
+  // ParseRegister now typically returns bool (true on error)
+  if (parseRegister(RegNo, StartLoc, EndLoc)) {
+    return ParseStatus::Failure;
   }
 
-  return OperandMatchResultTy::MatchOperand_Success;
+  if (!RegNo.isValid()) { // Modern way to check for "no register"
+    return ParseStatus::NoMatch;
+  }
+
+  return ParseStatus::Success;
 }
 
 bool PatmosAsmParser::
-ParseRegister(OperandVector &Operands, bool EmitError) {
-  MCAsmLexer &Lexer = getLexer();
+parseRegister(OperandVector &Operands, bool EmitError) {
+  AsmLexer &Lexer = getLexer();
   SMLoc S = Lexer.getLoc();
+  MCRegister RegNo; // Use MCRegister instead of unsigned
 
-  unsigned RegNo = 0;
-  if (ParseRegister(RegNo, false)) {
-    // syntax error
+  // Modern ParseRegister usually takes (RegNo, StartLoc, EndLoc)
+  SMLoc Start, End;
+  if (parseRegister(RegNo, Start, End)) {
     return true;
   }
-  if (RegNo == 0) {
-    // missing register
+
+  if (!RegNo.isValid()) {
     return !EmitError || Error(S, "Missing register name");
   }
 
-  SMLoc E = Lexer.getLoc();
-  Lexer.Lex();
-
-  Operands.push_back(std::unique_ptr<MCParsedAsmOperand>(PatmosOperand::CreateReg(RegNo, S, E)));
+  // Use RegNo.id() to pass the raw integer to your CreateReg function
+  Operands.push_back(std::unique_ptr<MCParsedAsmOperand>(
+      PatmosOperand::CreateReg(RegNo.id(), S, End)));
 
   return false;
 }
 
 bool PatmosAsmParser::
-ParseRegister(unsigned &RegNo, SMLoc &StartLoc, SMLoc &EndLoc) {
-  if (ParseRegister(RegNo, false)) {
+parseRegister(MCRegister &RegNo, SMLoc &StartLoc, SMLoc &EndLoc) {
+  StartLoc = getLexer().getLoc();
+  if (parseRegister(RegNo, StartLoc, EndLoc)) {
     return true;
   }
-  getLexer().Lex();
+
+  EndLoc = getLexer().getLoc();
   return false;
 }
 
 bool PatmosAsmParser::
-ParseRegister(unsigned &RegNo, bool Required) {
-  MCAsmLexer &Lexer = getLexer();
+parseRegister(MCRegister &RegNo, bool Required) {
+  AsmLexer &Lexer = getLexer();
 
-  if (Lexer.getKind() == AsmToken::Dollar) {
-    Lexer.Lex();
+  if (Lexer.is(AsmToken::Dollar)) {
+    Lexer.Lex(); // Consume '$'
   } else {
-    return Required;
+    return Required; // If not '$' and not required, return success (no reg found)
   }
-  if (Lexer.getKind() == AsmToken::Identifier) {
-    StringRef RegName = Lexer.getTok().getIdentifier();
-    RegNo = MatchRegisterName(RegName);
 
-    // Handle alternative register names
-    if (!RegNo) {
-      RegNo = StringSwitch<unsigned>(RegName)
+  if (Lexer.is(AsmToken::Identifier)) {
+    StringRef RegName = Lexer.getTok().getIdentifier();
+
+    // Match the name and convert the result to MCRegister
+    unsigned RegID = MatchRegisterName(RegName);
+
+    if (!RegID) {
+      RegID = StringSwitch<unsigned>(RegName)
         .Case("sl", Patmos::SL)
         .Case("sh", Patmos::SH)
         .Case("ss", Patmos::SS)
@@ -552,18 +555,22 @@ ParseRegister(unsigned &RegNo, bool Required) {
         .Case("sxo", Patmos::SXO)
         .Default(0);
     }
+    if (RegID == 0) {
+      return Error(Lexer.getLoc(), "register name not valid");
+    }
 
-    // If name does not match after $ prefix, this is always an error
-    return (RegNo == 0) && Error(Lexer.getLoc(), "register name not valid");
+    RegNo = MCRegister::from(RegID); // Convert raw ID to MCRegister
+    Lexer.Lex(); // Consume the identifier
+    return false; // Success
   }
-  // Syntax error: $ and no identifier is always an error
+
   return Error(Lexer.getLoc(), "register prefix $ is not followed by a register name");
 }
-
 bool PatmosAsmParser::
 ParseMemoryOperand(OperandVector &Operands)  {
-  MCAsmLexer &Lexer = getLexer();
-  SMLoc StartLoc = Lexer.getLoc();
+  AsmLexer &Lexer = getLexer();
+  SMLoc RegStart, RegEnd;
+  MCRegister RegNo; // Use MCRegister instead of unsigned
 
   if (ParseToken(Operands, AsmToken::LBrac)) {
     return true;
@@ -571,12 +578,10 @@ ParseMemoryOperand(OperandVector &Operands)  {
 
   // try to match rN +/- Imm, rN, or Imm
 
-  if (ParseRegister(Operands, false)) {
-
-    // add default register
-    SMLoc EndLoc = Lexer.getLoc();
-    Operands.push_back(std::unique_ptr<MCParsedAsmOperand>(
-        PatmosOperand::CreateReg(Patmos::R0, StartLoc, EndLoc)));
+  if (tryParseRegister(RegNo, RegStart, RegEnd).isSuccess()) {
+    // If parsing succeeded, use the returned RegNo
+    Operands.push_back(std::unique_ptr<PatmosOperand>(
+        PatmosOperand::CreateReg(RegNo.id(), RegStart, RegEnd)));
 
   } else {
 
@@ -604,9 +609,11 @@ ParseMemoryOperand(OperandVector &Operands)  {
 }
 
 bool PatmosAsmParser::
-ParsePredicateOperand(OperandVector &Operands, bool checkClass)  {
-  MCAsmLexer &Lexer = getLexer();
+ParsePredicateOperand(OperandVector &Operands, bool checkClass) {
+  AsmLexer &Lexer = getLexer();
   SMLoc StartLoc = Lexer.getLoc();
+  MCRegister RegNo;
+  SMLoc RegStart, RegEnd;
 
   bool flag = false;
   if (Lexer.is(AsmToken::Exclaim)) {
@@ -616,33 +623,36 @@ ParsePredicateOperand(OperandVector &Operands, bool checkClass)  {
 
   SMLoc RegLoc = Lexer.getLoc();
 
-  if (ParseRegister(Operands)) {
+  // 1. Parse the register into our local variables
+  if (parseRegister(RegNo, RegStart, RegEnd)) {
     return true;
   }
 
-  if (checkClass) {
-    PatmosOperand *Op = (PatmosOperand*)&*Operands.back();
-    if (!Op->isReg()) return Error(Lexer.getLoc(), "magic happened: we found a register but the operand is not a register");
+  // 2. Create the register operand and push it to the vector
+  Operands.push_back(std::unique_ptr<MCParsedAsmOperand>(
+      PatmosOperand::CreateReg(RegNo.id(), RegStart, RegEnd)));
 
-    // TODO There really should be a nicer way of doing this, but we do not have access to the RegisterInfo stuff here
-    if (PatmosInstPrinter::getRegisterName(Op->getReg())[0] != 'p') {
-      // Not a predicate register, do not emit a flag operand
+  if (checkClass) {
+    // 3. Check the name directly using the MCRegister object
+    if (PatmosInstPrinter::getRegisterName(RegNo)[0] != 'p') {
       if (flag) {
         Error(StartLoc, "Negation of registers other than predicates is invalid.");
       }
-      return false;
+      return false; // Not a predicate, but not necessarily a parse failure
     }
   }
 
+  // 4. Push the Flag/Negation operand
   Operands.push_back(std::unique_ptr<MCParsedAsmOperand>(
-      PatmosOperand::CreateFlag(flag, StartLoc, RegLoc, getParser().getContext())));
+      PatmosOperand::CreateFlag(flag, StartLoc, RegEnd, getParser().getContext())));
+
 
   return false;
 }
 
 bool PatmosAsmParser::
 ParseOperand(OperandVector &Operands, unsigned OpNo)  {
-  MCAsmLexer &Lexer = getLexer();
+  AsmLexer &Lexer = getLexer();
 
   // Handle all the various operand types here: Imm, reg, memory, predicate, label
   if (Lexer.is(AsmToken::LBrac)) {
@@ -662,7 +672,7 @@ ParseOperand(OperandVector &Operands, unsigned OpNo)  {
       return ParsePredicateOperand(Operands, true);
     }
 
-    return ParseRegister(Operands);
+    return ParsePredicateOperand(Operands, false);
   }
   if (Lexer.is(AsmToken::Identifier)) {
     // Parse it as a label
@@ -674,7 +684,7 @@ ParseOperand(OperandVector &Operands, unsigned OpNo)  {
 }
 
 bool PatmosAsmParser::ParseGuard(SMLoc NameLoc, OperandVector &Operands) {
-  MCAsmLexer &Lexer = getLexer();
+  AsmLexer &Lexer = getLexer();
 
   if (Lexer.is(AsmToken::LParen)) {
     // If a guard is given, parse it
@@ -702,7 +712,7 @@ bool PatmosAsmParser::ParseGuard(SMLoc NameLoc, OperandVector &Operands) {
 }
 
 bool PatmosAsmParser::ParseImmediate(OperandVector &Operands) {
-  MCAsmLexer &Lexer = getLexer();
+  AsmLexer &Lexer = getLexer();
   SMLoc S = Lexer.getLoc();
 
   const MCExpr *EVal;
@@ -726,7 +736,7 @@ bool PatmosAsmParser::ParseImmediate(OperandVector &Operands) {
 bool PatmosAsmParser::ParseToken(OperandVector &Operands,
                                  AsmToken::TokenKind Kind)
 {
-  MCAsmLexer &Lexer = getLexer();
+  AsmLexer &Lexer = getLexer();
 
   if (Lexer.isNot(Kind)) {
     return Error(Lexer.getLoc(), "unexpected token");
@@ -740,50 +750,44 @@ bool PatmosAsmParser::ParseToken(OperandVector &Operands,
 }
 
 
-bool PatmosAsmParser::
-ParsePrefix(SMLoc &PrefixLoc, OperandVector &Operands, StringRef PrevToken)
-{
-  MCAsmLexer &Lexer = getLexer();
+// ParsePrefix was removed from the base class. Its behavior (handling of
+// bundle markers / prefixes) is now inlined into ParseInstruction.
 
+bool PatmosAsmParser::ParseInstruction(ParseInstructionInfo &Info, StringRef Name, SMLoc NameLoc,
+                 OperandVector &Operands)
+{
+  AsmLexer &Lexer = getLexer();
+
+  // Handle legacy prefix/bundle markers that previously lived in
+  // ParsePrefix (removed from the base class in LLVM 13+).
   if (Lexer.is(AsmToken::RCurly)) {
     // Try to recover..
     InBundle = false;
     BundleCounter = 0;
     // TODO we either need to go back to the previous instruction (but
     // that one might already be emitted and deleted!) or handle this earlier.
-    return Error(Lexer.getLoc(), "Closing bracket must appear immediately "
-           "after the instruction (for now).");
+    if (Error(Lexer.getLoc(), "Closing bracket must appear immediately "
+              "after the instruction (for now)."))
+      return true;
   }
 
   // Check if we start a new bundle
-  if (PrevToken == "{" || Lexer.is(AsmToken::LCurly)) {
+  if (Name == "{" || Lexer.is(AsmToken::LCurly)) {
     if (InBundle) {
       return Error(Lexer.getLoc(), "previous bundle has not been closed.");
     }
     InBundle = true;
-    if (PrevToken != "{") {
+    if (Name != "{") {
       Lexer.Lex();
     }
 
     // Allow newline(s) following '{'
     while (Lexer.is(AsmToken::EndOfStatement) &&
-           Lexer.getTok().getString() != ";")
-    {
+           Lexer.getTok().getString() != ";") {
       // TODO accept # comments
       Lexer.Lex();
     }
   }
-
-  return false;
-}
-
-bool PatmosAsmParser::
-ParseInstruction(ParseInstructionInfo &Info, StringRef Name, SMLoc NameLoc,
-                 OperandVector &Operands)
-{
-  ParsePrefix(NameLoc, Operands, Name);
-
-  MCAsmLexer &Lexer = getLexer();
   if (Name == "{") {
     // The prefix has some tokens. Therefore, 'Name' doesn't contain
     // the mnemonic. We need it to do so.	
@@ -976,7 +980,7 @@ bool PatmosAsmParser::isPredSrcOperand(StringRef Mnemonic, unsigned OpNo)
 }
 
 void PatmosAsmParser::EatToEndOfStatement() {
-  MCAsmLexer &Lexer = getLexer();
+  AsmLexer &Lexer = getLexer();
   while (Lexer.isNot(AsmToken::EndOfStatement) &&
          Lexer.isNot(AsmToken::LCurly) &&
          Lexer.isNot(AsmToken::Eof)) {

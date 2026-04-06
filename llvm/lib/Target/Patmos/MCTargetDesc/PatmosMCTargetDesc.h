@@ -33,7 +33,6 @@ class Target;
 class Triple;
 
 MCCodeEmitter *createPatmosMCCodeEmitter(const MCInstrInfo &MCII,
-                                         const MCRegisterInfo &MRI,
                                          MCContext &Ctx);
 										 
 MCAsmBackend *createPatmosAsmBackend(const Target &T, const MCSubtargetInfo &STI,

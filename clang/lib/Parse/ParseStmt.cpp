@@ -494,8 +494,13 @@ Retry:
                                PrecedingLabel);
 
   case tok::annot_pragma_loopbound:
-    ProhibitAttributes(Attrs);
-    return ParsePragmaLoopbound(Stmts, StmtCtx, TrailingElseLoc, Attrs);
+    // Prohibit attributes that are not loopbound attributes, similar to
+    // how other pragma-handling cases behave. Attributes preceding the
+    // pragma must not be treated as statement attributes here.
+    ProhibitAttributes(CXX11Attrs);
+    ProhibitAttributes(GNUOrMSAttrs);
+    return ParsePragmaLoopbound(Stmts, StmtCtx, TrailingElseLoc, CXX11Attrs,
+                                PrecedingLabel);
 
   case tok::annot_pragma_dump:
     ProhibitAttributes(CXX11Attrs);
@@ -577,7 +582,7 @@ StmtResult Parser::ParseSEHTryBlock() {
 
   StmtResult TryBlock(ParseCompoundStatement(
       /*isStmtExpr=*/false,
-      Scope::DeclScope | Scope::CompoundStmtScope | Scope::SEHTryScope));
+      Scope::DeclScope | Scope::SEHTryScope | Scope::CompoundStmtScope));
   if (TryBlock.isInvalid())
     return TryBlock;
 
@@ -2408,8 +2413,6 @@ StmtResult Parser::ParsePragmaLoopHint(StmtVector &Stmts,
   // Create temporary attribute list.
   ParsedAttributes TempAttrs(AttrFactory);
 
-  SourceLocation StartLoc = Tok.getLocation();
-
   // Get loop hints and consume annotated token.
   while (Tok.is(tok::annot_pragma_loop_hint)) {
     LoopHint Hint;
@@ -2431,12 +2434,17 @@ StmtResult Parser::ParsePragmaLoopHint(StmtVector &Stmts,
       Stmts, StmtCtx, TrailingElseLoc, Attrs, EmptyDeclSpecAttrs,
       PrecedingLabel);
 
+  // Prepend the pragma attributes collected before the other attributes so
+  // the pragma-attributes range become part of Attrs range.
   Attrs.takeAllPrependingFrom(TempAttrs);
 
-  // Start of attribute range may already be set for some invalid input.
-  // See PR46336.
-  if (Attrs.Range.getBegin().isInvalid())
-    Attrs.Range.setBegin(StartLoc);
+  // Ensure attribute range covers the pragma start if needed.
+  // If Attrs.Range wasn't set, set it to the first pragma token start.
+  if (Attrs.Range.getBegin().isInvalid()) {
+    // Try to pick a reasonable start if TempAttrs has a range.
+    if (TempAttrs.Range.getBegin().isValid())
+      Attrs.Range.setBegin(TempAttrs.Range.getBegin());
+  }
 
   return S;
 }
