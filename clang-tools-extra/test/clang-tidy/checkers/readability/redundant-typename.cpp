@@ -157,6 +157,16 @@ typename T::R v = typename T::R();
 // CHECK-MESSAGES-20: :[[@LINE-1]]:1: warning: redundant 'typename' [readability-redundant-typename]
 // CHECK-FIXES-20: T::R v = typename T::R();
 
+template <typename T, typename>
+typename T::R PartiallySpecializedVariable = true;
+// CHECK-MESSAGES-20: :[[@LINE-1]]:1: warning: redundant 'typename' [readability-redundant-typename]
+// CHECK-FIXES-20: T::R PartiallySpecializedVariable = true;
+
+template <typename T>
+typename T::R PartiallySpecializedVariable<T, typename T::R> = false;
+// CHECK-MESSAGES-20: :[[@LINE-1]]:1: warning: redundant 'typename' [readability-redundant-typename]
+// CHECK-FIXES-20: T::R PartiallySpecializedVariable<T, typename T::R> = false;
+
 #endif // __cplusplus >= 201402L
 
 template <typename T>
@@ -269,6 +279,7 @@ WHOLE_TYPE_IN_MACRO Macro2;
 WHOLE_DECLARATION_IN_MACRO;
 
 template <typename T> struct Wrapper {};
+
 template <typename T>
 struct ClassWrapper {
   using R = T;
@@ -288,16 +299,34 @@ typename ClassWrapper<T>::R ClassWrapper<T>::g() {
   return {};
 }
 
-template <typename T> struct StructWrapper {};
+template <typename T>
+struct IntWrapper {
+  using R = int;
+  Wrapper<R> f();
+  R g();
+};
+
+template <typename T>
+Wrapper<typename IntWrapper<T>::R> IntWrapper<T>::f() {
+  return {};
+}
+
+template <typename T>
+typename IntWrapper<T>::R IntWrapper<T>::g() {
+// CHECK-MESSAGES-20: :[[@LINE-1]]:1: warning: redundant 'typename' [readability-redundant-typename]
+// CHECK-FIXES-20: IntWrapper<T>::R IntWrapper<T>::g() {
+  return {};
+}
+
 template <typename T>
 class ClassWithNestedStruct {
   struct Nested {};
-  StructWrapper<Nested> f();
+  Wrapper<Nested> f();
   Nested g();
 };
 
 template <typename T>
-StructWrapper<typename ClassWithNestedStruct<T>::Nested> ClassWithNestedStruct<T>::f() {
+Wrapper<typename ClassWithNestedStruct<T>::Nested> ClassWithNestedStruct<T>::f() {
   return {};
 }
 
