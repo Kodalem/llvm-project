@@ -84,16 +84,16 @@ public:
   // See: https://www.llvm.org/doxygen/BPFFrameLowering_8h_source.html implementation
   bool hasFPImpl(const MachineFunction &MF) const override;
 
-  void determineCalleeSaves(MachineFunction &MF, BitVector &SavedRegs,
-                            RegScavenger *RS) const override;
-  bool spillCalleeSavedRegisters(MachineBasicBlock &MBB,
-                                 MachineBasicBlock::iterator MI,
-                                 ArrayRef<CalleeSavedInfo> CSI,
-                                 Register TRI) const override;
-  bool restoreCalleeSavedRegisters(MachineBasicBlock &MBB,
-                                   MachineBasicBlock::iterator MI,
-                                   MutableArrayRef<CalleeSavedInfo> CSI,
-                                   const TargetRegisterInfo *TRI) const override;
+   void determineCalleeSaves(MachineFunction &MF, BitVector &SavedRegs,
+                             RegScavenger *RS) const override;
+   bool spillCalleeSavedRegisters(MachineBasicBlock &MBB,
+                                  MachineBasicBlock::iterator MI,
+                                  ArrayRef<CalleeSavedInfo> CSI,
+                                  const TargetRegisterInfo *TRI) const override;
+   bool restoreCalleeSavedRegisters(MachineBasicBlock &MBB,
+                                    MachineBasicBlock::iterator MI,
+                                    MutableArrayRef<CalleeSavedInfo> CSI,
+                                    const TargetRegisterInfo *TRI) const override;
   MachineBasicBlock::iterator
   eliminateCallFramePseudoInstr(MachineFunction &MF,
                                 MachineBasicBlock &MBB,

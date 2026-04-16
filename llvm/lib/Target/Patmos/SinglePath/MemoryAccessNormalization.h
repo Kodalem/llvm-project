@@ -50,7 +50,8 @@ public:
 
   /// getAnalysisUsage - Specify which passes this pass depends on
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<MachineLoopInfo>();
+    // Request MachineLoopInfo via its wrapper pass in the legacy pass manager
+    AU.addRequired<MachineLoopInfoWrapperPass>();
     AU.addRequired<ConstantLoopDominators>();
     AU.addPreserved<ConstantLoopDominators>();
     MachineFunctionPass::getAnalysisUsage(AU);

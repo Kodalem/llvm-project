@@ -249,8 +249,10 @@ void VirtualizePredicates::unpredicateCounterSpillReload(MachineFunction &MF) {
 				auto frame_idx = MF.getFrameInfo().CreateSpillStackObject(4, Align(4));
 
 				// Spill in preheader
+				// VReg argument is a virtual register placeholder; pass Register()
+				// (NoRegister) as the helper expects a Register there (not TRI).
 				TII->storeRegToStackSlot(*preheader, preheader->begin(), reg, true,
-						frame_idx, &Patmos::RRegsRegClass, TRI);
+						frame_idx, &Patmos::RRegsRegClass, Register());
 				preheader->begin()->getOperand(0).setReg(Patmos::P0);
 
 				// Reload in unilatch at final exit
@@ -293,15 +295,17 @@ void VirtualizePredicates::unpredicateCounterSpillReload(MachineFunction &MF) {
 
 			assert(Patmos::RRegsRegClass.contains(reg));
 			// Spill in prologue
-			TII->storeRegToStackSlot(*MF.begin(), MF.begin()->begin(), reg, true,
-					frame_idx, &Patmos::RRegsRegClass, TRI);
+						TII->storeRegToStackSlot(*MF.begin(), MF.begin()->begin(), reg, true,
+					frame_idx, &Patmos::RRegsRegClass, Register());
 			MF.begin()->begin()->setFlag(MachineInstr::FrameSetup);
 
 			// Spill in epilogue
 			auto end_block = std::find_if(MF.begin(), MF.end(), [](auto &block){ return block.succ_size() == 0;});
 			assert(end_block != MF.end());
 
-			TII->loadRegFromStackSlot(*end_block,end_block->getFirstTerminator(), reg, frame_idx, &Patmos::RRegsRegClass, TRI);
+			// Pass Register() as the VReg parameter (NoRegister) instead of TRI.
+			TII->loadRegFromStackSlot(*end_block, end_block->getFirstTerminator(), reg,
+									  frame_idx, &Patmos::RRegsRegClass, Register());
 			auto reload = std::prev(end_block->getFirstTerminator());
 
 			// We negate the predicate to ensure the register is only reloaded if the function

@@ -182,7 +182,7 @@ bool PatmosSPMark::runOnModule(Module &M) {
 
 MachineFunction *
 PatmosSPMark::getCallTargetMFOrAbort(MachineBasicBlock::iterator MI, MachineFunction::iterator MBB){
-  MachineFunction *MF = getCallTargetMF(&*MI, TODO);
+  MachineFunction *MF = getCallTargetMF(&*MI, *MMI);
   if (!MF) {
     errs() << "[Single-path] Cannot find ";
     bool foundSymbol = false;
@@ -235,7 +235,7 @@ void PatmosSPMark::scanAndRewriteCalls(MachineFunction *MF, Worklist &W) {
         }
         rewriteCall(&*MI, pseudo_target);
 
-        auto *new_target_MF = getCallTargetMF(&*MI, TODO);
+        auto *new_target_MF = getCallTargetMF(&*MI, *MMI);
         auto *new_PMFI =
             new_target_MF->getInfo<PatmosMachineFunctionInfo>();
         // we possibly have already marked the _sp variant as single-path
@@ -281,7 +281,8 @@ void PatmosSPMark::rewriteCall(MachineInstr *MI, bool pseudo_root_target) {
   // Remove the call target operand and add a new target operand
   // with an MachineInstrBuilder. In this case, it is inserted at
   // the right place, before the implicit defs of the call.
-  MI->RemoveOperand(2);
+  // FWhyYI... MachineInstr::RemoveOperand was renamed to removeOperand
+  MI->removeOperand(2);
   MachineInstrBuilder MIB(*MBB->getParent(), MI);
   MIB.addGlobalAddress(SPTarget);
   if(!pseudo_root_target && PatmosSinglePathInfo::useNewSinglePathTransform()) {

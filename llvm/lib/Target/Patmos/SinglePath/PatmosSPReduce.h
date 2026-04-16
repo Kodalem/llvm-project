@@ -28,6 +28,7 @@
 
 #include "PatmosSPBundling.h"
 #include "RAInfo.h"
+#include "llvm/CodeGen/MachineModuleInfo.h"
 
 namespace llvm {
 
@@ -221,6 +222,8 @@ namespace llvm {
     /// getAnalysisUsage - Specify which passes this pass depends on
     void getAnalysisUsage(AnalysisUsage &AU) const override {
       AU.addRequired<PatmosSPBundling>();
+      // MachineModuleInfo is required by helper utilities (e.g. resolving call targets)
+      AU.addRequired<MachineModuleInfoWrapperPass>();
       MachineFunctionPass::getAnalysisUsage(AU);
     }
 

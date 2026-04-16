@@ -11,6 +11,7 @@
 
 #include "llvm/IR/Function.h"
 #include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/ADT/SmallString.h"
 #include <optional>
 #include <utility>

@@ -564,7 +564,7 @@ void SPScheduler::runListSchedule(MachineBasicBlock *mbb) {
       TM.getInstrInfo()->insertNoop(*mbb, last_instr());
   }
   // Move any unscheduled instruction to the end
-  for(auto i = 0; i<unschedule_at_end; i++){
+  for(unsigned i = 0; i < unschedule_at_end; ++i) {
       // Add nop to ensure any need delays after e.g. loads are adhered to
       TM.getInstrInfo()->insertNoop(*mbb, last_instr());
 	  auto instr = &*mbb->instr_begin();

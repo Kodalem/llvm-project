@@ -58,8 +58,10 @@ namespace Patmos {
   }
 
   // Note: [001A] Ask Emad
-  // Christine, added a stub due to squelch the error at the PatmosAsmPrinter.cp
-  unsigned PSEUDO_LOOPBOUND;
+  // Christine, added a stub due to squelch the error at the PatmosAsmPrinter.cpp
+  // This caused issues with the generated instructions sets! It makes it fail the build if uncommented!
+  //unsigned PSEUDO_LOOPBOUND;
+
   } // namespace Patmos
 } // namespace llvm
 

@@ -260,7 +260,9 @@ public:
   virtual bool spillCalleeSavedRegisters(MachineBasicBlock &MBB,
                                          MachineBasicBlock::iterator MI,
                                          ArrayRef<CalleeSavedInfo> CSI,
-                                         Register TRI) const {
+                                         // I guess I will trust my CLion - Christine
+                                         // Todo: Investigate if it has changed or been fixed in upstream LLVM
+                                         const TargetRegisterInfo *TRI) const {
     return false;
   }
 

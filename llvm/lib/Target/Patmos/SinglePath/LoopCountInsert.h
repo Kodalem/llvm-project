@@ -16,6 +16,7 @@
 #include "PatmosSinglePathInfo.h"
 #include "PatmosMachineFunctionInfo.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
+#include "llvm/CodeGen/MachineLoopInfo.h"
 
 namespace llvm {
 
@@ -44,7 +45,8 @@ namespace llvm {
 		}
 
 		void getAnalysisUsage(AnalysisUsage &AU) const override {
-			AU.addRequired<MachineLoopInfo>();
+		        // Another MachineLoopInfo... becoming... MachineLoopInfoWrapperPass
+			AU.addRequired<MachineLoopInfoWrapperPass>();
 			MachineFunctionPass::getAnalysisUsage(AU);
 		}
 

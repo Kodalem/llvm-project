@@ -16,6 +16,7 @@
 #include "MCTargetDesc/PatmosBaseInfo.h"
 #include "TargetInfo/PatmosTargetInfo.h"
 #include "llvm/MC/MCDisassembler/MCDisassembler.h"
+#include "llvm/MC/MCDecoder.h"
 #include "llvm/MC/MCDecoderOps.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/MC/MCSubtargetInfo.h"
@@ -28,6 +29,7 @@
 // Todo: Implement Full MCDiagnostic support
 
 using namespace llvm;
+using namespace llvm::MCD;
 
 #define DEBUG_TYPE "patmos-disassembler"
 

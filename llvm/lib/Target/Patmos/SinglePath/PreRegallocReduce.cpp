@@ -26,7 +26,8 @@ bool PreRegallocReduce::runOnMachineFunction(MachineFunction &MF) {
 
 		EQ = &getAnalysis<EquivalenceClasses>();
 		RI = &MF.getRegInfo();
-		LI = &getAnalysis<MachineLoopInfo>();
+		// MachineLoopInfo is provided via the wrapper pass in the legacy pass manager
+		LI = &getAnalysis<MachineLoopInfoWrapperPass>().getLI();
 		vreg_map.clear(); // make sure other functions' maps aren't used
 
 		applyPredicates(&MF);
@@ -88,7 +89,8 @@ void PreRegallocReduce::applyPredicates(MachineFunction *MF) {
 				LLVM_DEBUG(dbgs() << "    skip frame setup: " << *MI);
 			}
 
-			if (MI->isCall() && !PatmosSinglePathInfo::isPseudoRoot(*getCallTargetMF(&*MI, TODO))) {
+			if (MI->isCall() && !PatmosSinglePathInfo::isPseudoRoot(*getCallTargetMF(&*MI,
+			                              getAnalysis<MachineModuleInfoWrapperPass>().getMMI()))) {
 				LLVM_DEBUG( dbgs() << "    call: " << *MI );
 				assert(!TII->isPredicated(*MI) && "call predicated");
 				DebugLoc DL = MI->getDebugLoc();
@@ -141,7 +143,7 @@ void PreRegallocReduce::applyPredicates(MachineFunction *MF) {
 	}
 }
 
-bool PreRegallocReduce::is_exit_edge(std::pair<Optional<MachineBasicBlock*>, MachineBasicBlock*> edge) {
+bool PreRegallocReduce::is_exit_edge(std::pair<std::optional<MachineBasicBlock*>, MachineBasicBlock*> edge) {
 	if(!edge.first) {
 		return false;
 	}
@@ -166,13 +168,13 @@ MachineBasicBlock* PreRegallocReduce::get_header_of(EqClass &eq_class) {
 	return get_header_of(*eq_class.members.begin());
 }
 
-Optional<MachineBasicBlock*> PreRegallocReduce::get_header_in_class(EqClass &eq_class) {
+std::optional<MachineBasicBlock*> PreRegallocReduce::get_header_in_class(EqClass &eq_class) {
 	auto header_in_class = std::find_if(eq_class.members.begin(), eq_class.members.end(),
 			[&](auto member){ return LI->isLoopHeader(member) || (member->pred_size() == 0);});
 	if(header_in_class != eq_class.members.end()) {
 		return *header_in_class;
 	} else {
-		return None;
+		return std::nullopt;
 	}
 }
 
@@ -183,7 +185,7 @@ void PreRegallocReduce::insertEntryDependencyDefinition(
 		return !dep.first;
 	}) == 1 && "No unique dependency on loop entry");
 	auto header = get_header_of(eq_class);
-	assert(eq_class.dependencies.count(std::make_pair(None, header)) && "Entry dependency not on header");
+	assert(eq_class.dependencies.count(std::make_pair(std::nullopt, header)) && "Entry dependency not on header");
 
 	Register initial_preg;
 	if(header->pred_size() == 0) {
@@ -266,7 +268,7 @@ void PreRegallocReduce::insertPredDefinitions(
 		// If there are more than 1 dependency edge, we can't use destructive definition
 		// (i.e. may only overwrite the old value in case the definition site is enabled)
 		// We don't count a dependency on the entry
-		bool non_destructive_def = eq_class.dependencies.size() > ((eq_class.dependencies.count(std::make_pair(None, class_header))) + 1);
+		bool non_destructive_def = eq_class.dependencies.size() > ((eq_class.dependencies.count(std::make_pair(std::nullopt, class_header))) + 1);
 
 		for(auto dep_edge: eq_class.dependencies) {
 			if(!dep_edge.first) {
@@ -406,14 +408,14 @@ static bool is_used(Register pred_vreg, MachineFunction &MF) {
 	}
 	return false;
 }
-static unsigned remove_defs(Register pred_vreg, MachineFunction &MF) {
+static unsigned remove_defs(Register pred_vreg, MachineFunction &MF, const PatmosRegisterInfo *TRI) {
 	assert(pred_vreg.isVirtual() && MF.getRegInfo().getRegClass(pred_vreg) == &Patmos::PRegsRegClass);
 	unsigned removed_count = 0;
 
 	for(MachineBasicBlock &block: MF) {
 		for(auto instr_iter = block.instr_begin(); instr_iter != block.instr_end(); ){
 
-			if(instr_iter->definesRegister(pred_vreg)) {
+			if(instr_iter->definesRegister(pred_vreg, TRI)) {
 				block.erase(instr_iter);
 				instr_iter = block.instr_begin();
 				removed_count++;
@@ -432,7 +434,7 @@ void PreRegallocReduce::removeUnusedPreds(MachineFunction &MF) {
 		for(auto eq_class: EQ->getAllClasses()) {
 			auto vreg = getVreg(eq_class);
 			if(!is_used(vreg, MF)) {
-				if(remove_defs(vreg, MF) > 0){
+					if(remove_defs(vreg, MF, TRI) > 0){
 					any_removals = true;
 				}
 			}

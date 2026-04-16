@@ -216,7 +216,7 @@ static Register new_vreg(MachineFunction &MF) {
 unsigned MemoryAccessNormalization::counter_compensate(MachineFunction &MF, unsigned max_accesses, unsigned min_accesses, bool should_insert) {
   assert((max_accesses - min_accesses) != 0 && "No compensation needed if no accesses are done");
 
-  auto &LI = getAnalysis<MachineLoopInfo>();
+  auto &LI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
   auto &RI = MF.getRegInfo();
   unsigned insert_count = 0;
   DebugLoc DL;

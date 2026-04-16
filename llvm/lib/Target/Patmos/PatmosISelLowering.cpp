@@ -41,7 +41,7 @@ using namespace llvm;
 
 PatmosTargetLowering::PatmosTargetLowering(const PatmosTargetMachine &tm,
                                            const PatmosSubtarget &STI) :
-  TargetLowering(tm), Subtarget(STI) {
+  TargetLowering(tm, STI), Subtarget(STI) {
 
   // Set up the register classes.
   // SRegs are not used for computations.
@@ -74,11 +74,18 @@ PatmosTargetLowering::PatmosTargetLowering(const PatmosTargetMachine &tm,
   setMinFunctionAlignment(Align(2));
   setPrefFunctionAlignment(Subtarget.getMinSubfunctionAlignment());
 
-  // Enable using divmod functions
-  setLibcallName(RTLIB::SDIVREM_I32, "__divmodsi4");
-  setLibcallName(RTLIB::UDIVREM_I32, "__udivmodsi4");
-  setLibcallName(RTLIB::SDIVREM_I64, "__divmoddi4");
-  setLibcallName(RTLIB::UDIVREM_I64, "__udivmoddi4");
+  // Where divrem? It caused compiler issues being compilable in the end, and wasn't
+  // really used anymore. TODO: Maybe find a way to renable them again
+  // https://codspeed.io/blog/why-rust-doesnt-need-a-standard-divrem
+  //setLibcallName(RTLIB::SDIVREM_I32, "__divmodsi4");
+  //setLibcallName(RTLIB::UDIVREM_I32, "__udivmodsi4");
+  //setLibcallName(RTLIB::SDIVREM_I64, "__divmoddi4");
+  //setLibcallName(RTLIB::UDIVREM_I64, "__udivmoddi4");
+  // TODO: Investigate if this actually renabled the previous call
+  setOperationAction(ISD::SDIVREM, MVT::i32, LibCall);
+  setOperationAction(ISD::UDIVREM, MVT::i32, LibCall);
+  setOperationAction(ISD::SDIVREM, MVT::i64, LibCall);
+  setOperationAction(ISD::UDIVREM, MVT::i64, LibCall);
 
   setOperationAction(ISD::LOAD,   MVT::i1, Custom);
   for (MVT VT : MVT::integer_valuetypes()) {
@@ -454,7 +461,7 @@ PatmosTargetLowering::LowerCCCArguments(SDValue Chain,
   if (isVarArg) {
     // create a fixed FI to reference the variadic parameters passed on the 
     // stack and store it with the patmos machine function info.
-    PMFI.setVarArgsFI(MFI.CreateFixedObject(4, CCInfo.getNextStackOffset(),
+    PMFI.setVarArgsFI(MFI.CreateFixedObject(4, CCInfo.getStackSize(),
                                              true));
   }
 
@@ -529,7 +536,7 @@ PatmosTargetLowering::LowerCCCCallTo(CallLoweringInfo &CLI,
   CCInfo.AnalyzeCallOperands(Outs, CC_Patmos);
 
   // Get a count of how many bytes are to be pushed on the stack.
-  unsigned NumBytes = CCInfo.getNextStackOffset();
+  unsigned NumBytes = CCInfo.getStackSize();
 
   Chain = DAG.getCALLSEQ_START(Chain, NumBytes, 0, dl);
 

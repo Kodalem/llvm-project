@@ -36,7 +36,10 @@ namespace llvm {
 
       /// CALL - These operations represent an abstract call
       /// instruction, which includes a bunch of information.
-      CALL = ISD::FIRST_TARGET_MEMORY_OPCODE
+      // Some LLVM versions no longer define ISD::FIRST_TARGET_MEMORY_OPCODE
+      // (the target-specific opcodes start at ISD::BUILTIN_OP_END). Use
+      // FIRST_NUMBER as the base for target opcodes.
+      CALL = FIRST_NUMBER
     };
   } // end namespace PatmosISD
 
@@ -45,7 +48,7 @@ namespace llvm {
 
   class PatmosTargetObjectFile : public TargetLoweringObjectFileELF {
   public:
-    void Initialize(MCContext &Ctx, const TargetMachine &TM) {
+    void Initialize(MCContext &Ctx, const TargetMachine &TM) override {
       TargetLoweringObjectFileELF::Initialize(Ctx, TM);
       InitializeELF(true); // set UseInitArray to true
     }
@@ -66,13 +69,13 @@ namespace llvm {
     EVT getSetCCResultType(const DataLayout &DL, LLVMContext &Context,
                            EVT VT) const override;
 
-    uint64_t getByValTypeAlignment(Type *Ty,
-                                   const DataLayout &DL) const override {
-      // Align any type passed by value on the stack to words
-      return 4;
+    Align getByValTypeAlignment(Type *Ty,
+                            const DataLayout &DL) const override {
+      // Align any type passed by value on the stack to words (4 bytes).
+      return Align(4);
     }
 
-    bool isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const {
+    bool isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const override {
       // Disallow GlobalAddresses to contain offsets (e.g. x + 4)
       // As patmos-ld doesn't know how to fix that when resolving
       // 'x' as a symbol.

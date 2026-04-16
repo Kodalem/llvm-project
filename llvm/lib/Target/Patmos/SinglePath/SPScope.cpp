@@ -14,6 +14,7 @@
 #include "PatmosSPBundling.h"
 #include "TargetInfo/PatmosTargetInfo.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/CodeGen/MachineFunction.h"
 
 using namespace llvm;

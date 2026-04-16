@@ -28,6 +28,8 @@
 #include "SinglePath/PatmosSinglePathInfo.h"
 #include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
+#include "llvm/CodeGen/MachineModuleInfo.h"
+#include <optional>
 
 namespace llvm {
 
@@ -62,10 +64,10 @@ namespace llvm {
 		MachineBasicBlock* get_header_of(EqClass &eq_class);
 
 		/// If the class contains the header, returns it.
-		Optional<MachineBasicBlock*> get_header_in_class(EqClass &eq_class);
+		std::optional<MachineBasicBlock*> get_header_in_class(EqClass &eq_class);
 
 		/// Returns whether this edge exits any loop
-		bool is_exit_edge(std::pair<Optional<MachineBasicBlock*>, MachineBasicBlock*> edge);
+		bool is_exit_edge(std::pair<std::optional<MachineBasicBlock*>, MachineBasicBlock*> edge);
 
 		Register getVreg(EqClass &eq_class);
 
@@ -90,13 +92,14 @@ namespace llvm {
 			return "Patmos Single-Path Pre-register-allocation Reducer";
 		}
 
-		void getAnalysisUsage(AnalysisUsage &AU) const override {
-			AU.addRequired<EquivalenceClasses>();
-			AU.addPreserved<EquivalenceClasses>();
-			AU.addRequired<MachineLoopInfo>();
-			AU.addPreserved<MachineLoopInfo>();
-			MachineFunctionPass::getAnalysisUsage(AU);
-		}
+	        void getAnalysisUsage(AnalysisUsage &AU) const override {
+		        AU.addRequired<EquivalenceClasses>();
+		        AU.addPreserved<EquivalenceClasses>();
+		        AU.addRequired<MachineLoopInfoWrapperPass>();
+		        AU.addPreserved<MachineLoopInfoWrapperPass>();
+		        AU.addRequired<MachineModuleInfoWrapperPass>();
+		        MachineFunctionPass::getAnalysisUsage(AU);
+		      }
 
 		bool runOnMachineFunction(MachineFunction &MF) override;
 	};

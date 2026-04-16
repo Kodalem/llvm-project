@@ -26,7 +26,7 @@ bool Linearizer::runOnMachineFunction(MachineFunction &MF) {
 			dbgs() << "[Single-Path] Linearizing " << MF.getFunction().getName() << "\n";
 		);
 
-		auto &LI = getAnalysis<MachineLoopInfo>();
+		auto &LI = getAnalysis<MachineLoopInfoWrapperPass>().getLI();
 		// Update unilatch to use the counter as condition (instead of unconditionally branching
 		for(auto &header_mbb: MF){
 			if(!LI.isLoopHeader(&header_mbb)) continue;
@@ -59,8 +59,10 @@ bool Linearizer::runOnMachineFunction(MachineFunction &MF) {
 						auto reg = iter->getOperand(0).getReg();
 						assert(Patmos::RRegsRegClass.contains(reg));
 						auto frame_idx = iter->getOperand(1).getImm();
+						// The VReg parameter (virtual register placeholder) is expected here;
+						// pass Register() (NoRegister) as helper placeholder.
 						TII->loadRegFromStackSlot(*unilatch,unilatch->getFirstTerminator(), reg,
-								frame_idx, &Patmos::RRegsRegClass, TRI);
+								frame_idx, &Patmos::RRegsRegClass, Register());
 						std::prev(unilatch->getFirstTerminator())->getOperand(1).setReg(counter_check_vreg);
 						std::prev(unilatch->getFirstTerminator())->getOperand(2).setImm(1);
 						unilatch->erase(iter);

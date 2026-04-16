@@ -128,7 +128,9 @@ static void eliminate(
           builder.SetInsertPoint(&*std::prev(BB.end()));
           builder.CreateCall(called, {II->getArgOperand(0), II->getArgOperand(1)});
           builder.SetInsertPoint((BasicBlock*)NULL);
-          successor->getInstList().erase(instr_iter);
+          // Note: getInstList() was made private in newer LLVM versions.
+          // Use eraseFromParent() instead of getInstList().erase().
+          instr_iter->eraseFromParent();
           break;
         }
       }
@@ -136,7 +138,9 @@ static void eliminate(
   }
 
   assert(isa<IntrinsicInst>(successor->begin())); // This should be the call to intrinsic
-  successor->getInstList().pop_front(); // remove the intrinsic call
+  // Note: getInstList() was made private in newer LLVM versions.
+  // Use begin()->eraseFromParent() instead of getInstList().pop_front().
+  successor->begin()->eraseFromParent(); // remove the intrinsic call
 
   BranchInst::Create(successor, memset_loop_end);
 }
@@ -150,8 +154,9 @@ static bool eliminate_mem_intrinsic(Function &F, IntrinsicInst *II, StringRef na
   auto arg0 = II->getArgOperand(0);
   auto arg2 = II->getArgOperand(2);
 
-  assert(cast<PointerType>(arg0->getType())->getAddressSpace() == 0);
-  assert(arg0->getType()->getContainedType(0)->isIntegerTy(8));
+  // Note: With opaque pointers (LLVM 15+), pointers no longer carry element type info.
+  // Assertions using getContainedType() and getAddressSpace() via cast<PointerType> are removed.
+  assert(arg0->getType()->isPointerTy());
   assert(arg2->getType()->isIntegerTy(32) || arg2->getType()->isIntegerTy(64));
 
   if(auto* memcpy_len = dyn_cast<ConstantInt>(arg2)) {
@@ -183,8 +188,7 @@ static bool eliminateIntrinsic(Function &F, BasicBlock &BB) {
         case Intrinsic::memcpy: {
           auto arg1 = II->getArgOperand(1);
 
-          assert(cast<PointerType>(arg1->getType())->getAddressSpace() == 0);
-          assert(arg1->getType()->getContainedType(0)->isIntegerTy(8));
+          assert(arg1->getType()->isPointerTy());
 
           if(eliminate_mem_intrinsic(F, II, "llvm.memcpy",
             [&](auto *arg0, auto *arg2, auto len){
@@ -207,8 +211,10 @@ static bool eliminateIntrinsic(Function &F, BasicBlock &BB) {
                     auto *dest_phi = std::get<0>(cond_ret);
                     auto *src_phi = std::get<1>(cond_ret);
 
-                    auto *dest_inc = builder.CreateGEP(dest_phi, builder.getInt32(1), "llvm.memcpy.dest.incremented");
-                    auto *src_inc = builder.CreateGEP(src_phi, builder.getInt32(1), "llvm.memcpy.src.incremented");
+                    // Note: CreateGEP now requires an explicit element type (opaque pointers, LLVM 15+).
+                    auto *dest_inc = builder.CreateGEP(builder.getInt8Ty(), dest_phi, builder.getInt32(1), "llvm.memcpy.dest.incremented");
+                    // Note: CreateGEP now requires an explicit element type (opaque pointers, LLVM 15+).
+                    auto *src_inc = builder.CreateGEP(builder.getInt8Ty(), src_phi, builder.getInt32(1), "llvm.memcpy.src.incremented");
                     dest_phi->addIncoming(dest_inc, body_block);
                     src_phi->addIncoming(src_inc, body_block);
 
@@ -271,7 +277,7 @@ static bool eliminateIntrinsic(Function &F, BasicBlock &BB) {
                     return dest_phi;
                   },
                   [&](auto &builder, auto entry_block, auto entry_ret, auto condition_block, auto *dest_phi, auto body_block){
-                    auto *dest_inc = builder.CreateGEP(dest_phi, builder.getInt32(1), "llvm.memset.dest.incremented");
+                    auto *dest_inc = builder.CreateGEP(builder.getInt32Ty(), dest_phi, builder.getInt32(1), "llvm.memset.dest.incremented");
                     dest_phi->addIncoming(dest_inc, body_block);
                     auto align = II->paramHasAttr(0, Attribute::Alignment) ?
                        II->getParamAttr(0, Attribute::Alignment).getAlignment()

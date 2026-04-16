@@ -25,7 +25,7 @@ public:
   explicit PatmosSelectionDAGInfo();
   ~PatmosSelectionDAGInfo();
 
-  bool disableGenericCombines(CodeGenOpt::Level OptLevel) const override {
+  bool disableGenericCombines(CodeGenOptLevel OptLevel) const override {
     return false;
   }
 };

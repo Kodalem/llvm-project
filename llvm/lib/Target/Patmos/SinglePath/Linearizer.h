@@ -36,7 +36,8 @@ namespace llvm {
 
 		void getAnalysisUsage(AnalysisUsage &AU) const override {
 			AU.addRequired<PatmosSinglePathInfo>();
-			AU.addRequired<MachineLoopInfo>();
+			// Request the MachineLoopInfo via the legacy wrapper pass
+			AU.addRequired<MachineLoopInfoWrapperPass>();
 			MachineFunctionPass::getAnalysisUsage(AU);
 		}
 

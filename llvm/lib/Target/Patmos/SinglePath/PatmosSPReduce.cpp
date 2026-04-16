@@ -902,7 +902,7 @@ void PatmosSPReduce::fixupKillFlagOfCondRegs(void) {
         firstMI = MBB->begin();
         lastMI != firstMI; --lastMI) {
       MachineOperand *MO;
-      if ((MO = lastMI->findRegisterUseOperand(CondReg.getReg())) != NULL) {
+      if ((MO = lastMI->findRegisterUseOperand(CondReg.getReg(), TRI)) != NULL) {
         MO->setIsKill(true);
         break;
       }
@@ -953,7 +953,8 @@ void PatmosSPReduce::applyPredicates(SPScope *S, MachineFunction &MF) {
       auto instrPredNeg = instrPreds[&(*MI)].second ? 1 : 0;
       auto predReg = predRegs.count(instrPred) ? predRegs[instrPred] : Patmos::P0;
       DEBUG_TRACE( dbgs() << "Predicate (" << instrPred << ") set to register: (" << predReg << ")\n");
-      if (MI->isCall() && !PatmosSinglePathInfo::isPseudoRoot(*getCallTargetMF(&*MI, TODO))) {
+      if (MI->isCall() && !PatmosSinglePathInfo::isPseudoRoot(*getCallTargetMF(&*MI,
+                                                                                getAnalysis<MachineModuleInfoWrapperPass>().getMMI()))) {
           DEBUG_TRACE( dbgs() << "    call: " << *MI );
           assert(!TII->isPredicated(*MI) && "call predicated");
           DebugLoc DL = MI->getDebugLoc();

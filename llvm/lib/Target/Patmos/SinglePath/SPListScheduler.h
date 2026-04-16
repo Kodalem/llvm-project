@@ -680,7 +680,7 @@ std::map<unsigned, unsigned> list_schedule(
     };
 
     auto next = get_next_ready(instr_begin, instr_end, ready, executing, reads, writes,
-        enable_dual_issue.hasValue(), false, true, [](auto instr){ return true;},
+        enable_dual_issue.has_value(), false, true, [](auto instr){ return true;},
     	[](auto instr){ return true;}
     );
     if(next) {
@@ -689,7 +689,7 @@ std::map<unsigned, unsigned> list_schedule(
       if(enable_dual_issue && !(*next)->is_long) {
         ready = ready_nodes();
         auto next2 = get_next_ready(instr_begin, instr_end, ready, executing, reads, writes,
-          enable_dual_issue.hasValue(), !(*next)->may_second_slot, false,
+          enable_dual_issue.has_value(), !(*next)->may_second_slot, false,
           [&](auto instr){
             if(enable_dual_issue) {
               return std::get<3>(*enable_dual_issue)(

@@ -270,7 +270,7 @@ namespace llvm {
       GetReturnInfo(F.getCallingConv(), F.getReturnType(), F.getAttributes(),
           Outs, *TLI, TD);
       assert(TLI->CanLowerReturn(F.getCallingConv(),
-            const_cast<MachineFunction&>(MF), F.isVarArg(), Outs, Ctx));
+            const_cast<MachineFunction&>(MF), F.isVarArg(), Outs, Ctx, F.getReturnType()));
 
       // Set up the incoming argument description vector.
       unsigned Idx = 1;
@@ -285,39 +285,40 @@ namespace llvm {
           Type *ArgTy = VT.getTypeForEVT(Ctx);
           ISD::ArgFlagsTy Flags;
           unsigned OriginalAlignment =
-            TD.getABITypeAlignment(ArgTy);
+            TD.getABITypeAlign(ArgTy).value();
 
-          if (F.getAttributes().hasAttribute(Idx, Attribute::ZExt))
+          if (F.hasParamAttribute(Idx - 1, Attribute::ZExt))
             Flags.setZExt();
-          if (F.getAttributes().hasAttribute(Idx, Attribute::SExt))
+          if (F.hasParamAttribute(Idx - 1, Attribute::SExt))
             Flags.setSExt();
-          if (F.getAttributes().hasAttribute(Idx, Attribute::InReg))
+          if (F.hasParamAttribute(Idx - 1, Attribute::InReg))
             Flags.setInReg();
-          if (F.getAttributes().hasAttribute(Idx, Attribute::StructRet))
+          if (F.hasParamAttribute(Idx - 1, Attribute::StructRet))
             Flags.setSRet();
-          if (F.getAttributes().hasAttribute(Idx, Attribute::ByVal)) {
+          if (F.hasParamAttribute(Idx - 1, Attribute::ByVal)) {
             Flags.setByVal();
-            PointerType *Ty = cast<PointerType>(I->getType());
-            Type *ElementTy = Ty->getElementType();
+            Type *ElementTy = F.getParamByValType(Idx - 1);
             Flags.setByValSize(TD.getTypeAllocSize(ElementTy));
             // For ByVal, alignment should be passed from FE.  BE will guess if
             // this info is not there but there are cases it cannot get right.
-            unsigned FrameAlign;
-            if (F.getParamAlignment(Idx))
-              FrameAlign = F.getParamAlignment(Idx);
+            Align FrameAlign;
+            if (F.getParamAlign(Idx - 1))
+              FrameAlign = F.getParamAlign(Idx - 1).value();
             else
               FrameAlign = TLI->getByValTypeAlignment(ElementTy, TD);
-            Flags.setByValAlign(Align(FrameAlign));
+            Flags.setMemAlign(FrameAlign);
           }
-          if (F.getAttributes().hasAttribute(Idx, Attribute::Nest))
+          if (F.hasParamAttribute(Idx - 1, Attribute::Nest))
             Flags.setNest();
           Flags.setOrigAlign(Align(OriginalAlignment));
 
-          EVT RegisterVT = TLI->getRegisterType(Ctx, VT);
+          MVT RegisterVT = TLI->getRegisterType(Ctx, VT);
           unsigned NumRegs = TLI->getNumRegisters(Ctx, VT);
           for (unsigned i = 0; i != NumRegs; ++i) {
             // TODO check if the VT arguments are correct.. no docs around.
-            ISD::InputArg MyFlags(Flags, RegisterVT, VT, isArgValueUsed,
+            // Christine here, no idea either, but had to add the argument type
+            // to make LLVM happy
+            ISD::InputArg MyFlags(Flags, RegisterVT, VT , ArgTy, isArgValueUsed,
                 Idx-1, i*RegisterVT.getStoreSize());
             if (NumRegs > 1 && i == 0)
               MyFlags.Flags.setSplit();

@@ -44,12 +44,17 @@ void ConstantLoopDominators::calculate(MachineFunction &MF, MachineLoopInfo &LI)
 }
 
 bool ConstantLoopDominators::runOnMachineFunction(MachineFunction &MF) {
-  calculate(MF, getAnalysis<MachineLoopInfo>());
+  // MachineLoopInfo is provided via the MachineLoopInfoWrapperPass in the
+  // legacy pass manager. Request the wrapper and access the MachineLoopInfo
+  // instance through getLI().
+  calculate(MF, getAnalysis<MachineLoopInfoWrapperPass>().getLI());
   return false;
 }
 
 void ConstantLoopDominators::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.addRequired<MachineLoopInfo>();
+  // Require the legacy wrapper pass that exposes MachineLoopInfo... again...
+  // ... and again... and again...
+  AU.addRequired<MachineLoopInfoWrapperPass>();
   AU.setPreservesAll();
   MachineFunctionPass::getAnalysisUsage(AU);
 }

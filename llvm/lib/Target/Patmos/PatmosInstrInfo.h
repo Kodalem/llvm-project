@@ -45,59 +45,55 @@ public:
   PatmosInstrAnalyzer(MCContext &Ctx, const MCInstrInfo &MII)
     :  MCStreamer(Ctx), MII(MII), count(0), size(0), call(false) {}
 
-  void changeSection(MCSection *Section, const MCExpr *Subsection) override {}
+  // Match the current MCStreamer API.
+  void changeSection(MCSection *Section, uint32_t Subsection) override {}
   void emitLabel(MCSymbol *Symbol, SMLoc Loc = SMLoc()) override {
     if (Symbol->isUndefined()) return;
     assert(getCurrentSection().first && "Cannot emit before setting section!");
-    AssignFragment(Symbol, &getCurrentSection().first->getDummyFragment());
+
+    Symbol->setFragment(&getCurrentSection().first->getDummyFragment());
   }
-  void emitAssemblerFlag(MCAssemblerFlag Flag) override {}
-  void emitThumbFunc(MCSymbol *Func) override {}
   void emitAssignment(MCSymbol *Symbol, const MCExpr *Value) override {}
   void emitWeakReference(MCSymbol *Alias, const MCSymbol *Symbol) override {}
   bool emitSymbolAttribute(MCSymbol *Symbol, MCSymbolAttr Attribute) override {
     return true;
   }
   void emitSymbolDesc(MCSymbol *Symbol, unsigned DescValue) override {}
-  void BeginCOFFSymbolDef(const MCSymbol *Symbol) override {}
-  void EmitCOFFSymbolStorageClass(int StorageClass) override {}
-  void EmitCOFFSymbolType(int Type) override {}
-  void EndCOFFSymbolDef() override {}
-  void EmitCOFFSecRel32(MCSymbol const *Symbol, uint64_t Offset) override {}
+  void beginCOFFSymbolDef(const MCSymbol *Symbol) override {}
+  void emitCOFFSymbolStorageClass(int StorageClass) override {}
+  void emitCOFFSymbolType(int Type) override {}
+  void endCOFFSymbolDef() override {}
+  void emitCOFFSecRel32(MCSymbol const *Symbol, uint64_t Offset) override {}
   void emitELFSize(MCSymbol *Symbol, const MCExpr *Value) override {}
   void emitCommonSymbol(MCSymbol *Symbol, uint64_t Size,
-				unsigned ByteAlignment) override {}
+                        Align ByteAlignment) override {}
   void emitLocalCommonSymbol(MCSymbol *Symbol, uint64_t Size,
-				     unsigned ByteAlignment) override {}
+                             Align ByteAlignment) override {}
   void emitZerofill(MCSection *Section, MCSymbol *Symbol = nullptr,
-			    uint64_t Size = 0, unsigned ByteAlignment = 0,
-                SMLoc Loc = SMLoc()) override {}
+                    uint64_t Size = 0, Align ByteAlignment = Align(1),
+                    SMLoc Loc = SMLoc()) override {}
   void emitTBSSSymbol(MCSection *Section, MCSymbol *Symbol,
-			      uint64_t Size, unsigned ByteAlignment = 0) override {}
+                      uint64_t Size, Align ByteAlignment = Align(1)) override {}
   void emitBytes(StringRef Data) override {}
   void emitValueImpl(const MCExpr *Value, unsigned Size,
-                             SMLoc Loc = SMLoc()) override {}
+                     SMLoc Loc = SMLoc()) override {}
   void emitULEB128Value(const MCExpr *Value) override {}
   void emitSLEB128Value(const MCExpr *Value) override {}
-  void emitGPRel32Value(const MCExpr *Value) override {}
-  void emitValueToAlignment(unsigned ByteAlignment, int64_t Value = 0,
-				    unsigned ValueSize = 1,
-				    unsigned MaxBytesToEmit = 0) override {}
-  void emitCodeAlignment(unsigned ByteAlignment,
-                 const MCSubtargetInfo *STI, unsigned MaxBytesToEmit = 0) override {}
+  void emitValueToAlignment(Align Alignment, int64_t Fill = 0,
+                            uint8_t FillLen = 1,
+                            unsigned MaxBytesToEmit = 0) override {}
+  void emitCodeAlignment(Align Alignment,
+                         const MCSubtargetInfo *STI, unsigned MaxBytesToEmit = 0) override {}
   void emitValueToOffset(const MCExpr *Offset,  unsigned char Value,
                          SMLoc Loc) override {}
   void emitFileDirective(StringRef Filename) override {}
   void emitDwarfLocDirective(unsigned FileNo, unsigned Line,
-				     unsigned Column, unsigned Flags,
-				     unsigned Isa, unsigned Discriminator,
-				     StringRef FileName) override {}
-  void emitBundleAlignMode(unsigned AlignPow2) override {}
-  void emitBundleLock(bool AlignToEnd) override {}
-  void emitBundleUnlock() override {}
+                             unsigned Column, unsigned Flags,
+                             unsigned Isa, unsigned Discriminator,
+                             StringRef FileName, StringRef Comment) override {}
   void finishImpl() override {}
 
-  void reset() {
+  void reset() override {
     count = 0;
     size = 0;
     call = false;
@@ -128,7 +124,7 @@ public:
   /// such, whenever a client has an instance of instruction info, it should
   /// always be able to get register info as well (through this method).
   ///
-  virtual const TargetRegisterInfo &getRegisterInfo() const { return RI; }
+  const TargetRegisterInfo &getRegisterInfo() const { return RI; }
 
   const PatmosRegisterInfo &getPatmosRegisterInfo() const { return RI; }
 
@@ -138,28 +134,31 @@ public:
   bool findCommutedOpIndices(const MachineInstr &MI, unsigned &SrcOpIdx1,
                              unsigned &SrcOpIdx2) const override;
 
-  void copyPhysReg(MachineBasicBlock &MBB,
-                   MachineBasicBlock::iterator I, const DebugLoc &DL,
-                   MCRegister DstReg, MCRegister SrcReg,
-                   bool KillSrc) const override;
+   void copyPhysReg(MachineBasicBlock &MBB,
+                    MachineBasicBlock::iterator I, const DebugLoc &DL,
+                    Register DestReg, Register SrcReg, bool KillSrc,
+                    bool RenamableDest = false, bool RenamableSrc = false) const override;
 
-  void storeRegToStackSlot(MachineBasicBlock &MBB,
-                           MachineBasicBlock::iterator MI,
-                           Register SrcReg, bool isKill,
-                           int FrameIndex,
-                           const TargetRegisterClass *RC,
-                           const TargetRegisterInfo *TRI) const override;
-  void loadRegFromStackSlot(MachineBasicBlock &MBB,
+   void storeRegToStackSlot(MachineBasicBlock &MBB,
                             MachineBasicBlock::iterator MI,
-                            Register DestReg, int FrameIdx,
+                            Register SrcReg, bool isKill,
+                            int FrameIndex,
                             const TargetRegisterClass *RC,
-                            const TargetRegisterInfo *TRI) const override;
+                            Register VReg,
+                            MachineInstr::MIFlag Flags = MachineInstr::NoFlags) const override;
+   void loadRegFromStackSlot(MachineBasicBlock &MBB,
+                             MachineBasicBlock::iterator MI,
+                             Register DestReg, int FrameIdx,
+                             const TargetRegisterClass *RC,
+                             Register VReg,
+                             unsigned SubReg = 0,
+                             MachineInstr::MIFlag Flags = MachineInstr::NoFlags) const override;
 
-  unsigned isStoreToStackSlot(const MachineInstr &MI,
-                              int &FrameIndex) const override;
-
-  unsigned isLoadFromStackSlot(const MachineInstr &MI,
+   Register isStoreToStackSlot(const MachineInstr &MI,
                                int &FrameIndex) const override;
+
+   Register isLoadFromStackSlot(const MachineInstr &MI,
+                                int &FrameIndex) const override;
 
   /// insertNoop - Insert a noop into the instruction stream at the specified
   /// point.
@@ -332,7 +331,7 @@ public:
 
   bool canIssueInSlot(const MachineInstr *MI, unsigned Slot) const;
 
-  int getOperandLatency(const InstrItineraryData *ItinData,
+  std::optional<unsigned> getOperandLatency(const InstrItineraryData *ItinData,
                                 const MachineInstr &DefMI, unsigned DefIdx,
                                 const MachineInstr &UseMI,
                                 unsigned UseIdx) const override;

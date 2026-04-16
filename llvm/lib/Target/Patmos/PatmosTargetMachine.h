@@ -22,6 +22,7 @@
 #include "PatmosRegisterInfo.h"
 #include "PatmosSubtarget.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/Support/CodeGen.h"
 #include "llvm/CodeGen/CodeGenTargetMachineImpl.h"
 
 namespace llvm {
@@ -38,9 +39,9 @@ public:
                       StringRef CPU,
                       StringRef FS,
                       const TargetOptions &Options,
-                      Optional<Reloc::Model> RM,
-                      Optional<CodeModel::Model> CM,
-                      CodeGenOpt::Level L, bool JIT);
+                      std::optional<Reloc::Model> RM,
+                      std::optional<CodeModel::Model> CM,
+                      CodeGenOptLevel L, bool JIT);
 
   const PatmosInstrInfo *getInstrInfo() const { return Subtarget.getInstrInfo(); }
   const DataLayout *getDataLayout() const { return &DL;}
@@ -48,6 +49,10 @@ public:
     return getSubtargetImpl();
   }
   const PatmosSubtarget *getSubtargetImpl() const { return &Subtarget; }
+
+  static bool classof(const TargetMachine *TM) {
+    return true; // Simple check since we don't have other TargetMachines in this context.
+  }
 
   const TargetRegisterInfo *getRegisterInfo() const {
     return &Subtarget.getInstrInfo()->getRegisterInfo();

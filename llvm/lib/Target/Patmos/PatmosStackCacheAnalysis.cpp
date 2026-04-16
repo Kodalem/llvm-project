@@ -44,6 +44,8 @@
 #include <fstream>
 #include <sstream>
 
+namespace sys = llvm::sys;
+
 /// Utility for deleting owned members of an object
 #define DELETE_MEMBERS(vec) \
     while(! vec.empty()) { \
@@ -1659,7 +1661,18 @@ namespace llvm {
         return std::numeric_limits<unsigned int>::max();
       }
 
-      sys::path::append(LPname, "scc.lp");
+      // Use standard C++ instead of whatever this was before...
+      // Because std::filesystem::path::append is an instance method rather
+      // than a static function, it cannot directly modify a string buffer
+      // like LLVM's sys::path::append did. To solve this, the new code creates
+      // a temporary path object within a local scope, appends the filename using
+      // the /= operator, and reassigns the resulting path back to the original
+      // string variable.
+      {
+        std::filesystem::path p(LPname.c_str());
+        p /= "scc.lp";
+        LPname = p.c_str();
+      }
 
       std::error_code ErrMsg;
       raw_fd_ostream OS(LPname.c_str(), ErrMsg);
@@ -2320,10 +2333,10 @@ namespace llvm {
       auto progName = sys::findProgramByName(Solve_ilp);
     if (progName && sys::ExecuteAndWait(StringRef(*progName),
                               llvm::ArrayRef<StringRef>(args),
-                              llvm::None,
-                              llvm::ArrayRef<Optional<StringRef>>(),
+                              std::nullopt,
+                              llvm::ArrayRef<std::optional<StringRef>>(),
                               0,0,&ErrMsg)) {
-        report_fatal_error("calling ILP solver (" + Solve_ilp + "): " + ErrMsg);
+        report_fatal_error(StringRef("calling ILP solver (" + Solve_ilp + "): " + ErrMsg));
       }
       else {
         // read solution
@@ -2335,7 +2348,7 @@ namespace llvm {
         //sys::path::replace_extension(SOLname, ".sol");
 
         if (!sys::fs::exists(SOLname))
-          report_fatal_error("Failed to read ILP solution");
+          report_fatal_error(StringRef("Failed to read ILP solution"));
 
         std::ifstream IS(SOLname.c_str());
         assert(IS.good());
@@ -2376,7 +2389,11 @@ namespace llvm {
         return std::numeric_limits<unsigned int>::max();
       }
 
-      sys::path::append(LPname, "scc.lp");
+      {
+        std::filesystem::path p(LPname.c_str());
+        p /= "scc.lp";
+        LPname = p.c_str();
+      }
 
       std::error_code ErrCode;
       raw_fd_ostream OS(LPname.c_str(), ErrCode);
@@ -3186,8 +3203,7 @@ namespace llvm {
 
       // remove the UNKNOWN nodes from the graph and free them
       std::for_each(cleanup.begin(), cleanup.end(),
-                 std::bind1st(std::mem_fun(&SpillCostAnalysisGraph::deleteNode),
-                             &SCAGraph));
+                 [&](SCANode *N) { SCAGraph.deleteNode(N); });
 
       // get unbounded (!) displacement of root node
       unsigned int maxDisplacment = getMinMaxDisplacement(

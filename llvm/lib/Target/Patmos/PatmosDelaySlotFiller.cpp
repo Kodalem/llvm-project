@@ -94,7 +94,7 @@ namespace {
       return "Patmos Delay Slot Filler";
     }
 
-    bool runOnMachineFunction(MachineFunction &F) {
+    bool runOnMachineFunction(MachineFunction &F) override {
       LLVM_DEBUG(dbgs() << "\n********** Patmos Delay Slot Filler **********\n");
       LLVM_DEBUG(dbgs() << "********** Function: " << F.getFunction().getName() << "**********\n");
       LLVM_DEBUG(F.dump());

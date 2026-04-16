@@ -30,10 +30,7 @@ using namespace llvm;
 
 
 MCOperand PatmosMCInstLower::LowerSymbolOperand(const MachineOperand &MO, unsigned Offset) const {
-  MCSymbolRefExpr::VariantKind Kind;
   const MCSymbol *Symbol;
-
-  Kind = MCSymbolRefExpr::VK_None;
 
   // Note: jump table entries (refs to BBs) are lowered in
   // PatmosISelLowering::LowerCustomJumpTableEntry
@@ -65,7 +62,7 @@ MCOperand PatmosMCInstLower::LowerSymbolOperand(const MachineOperand &MO, unsign
   default: llvm_unreachable("unknown symbol operand type");
   }
 
-  const MCSymbolRefExpr *MCSym = MCSymbolRefExpr::create(Symbol, Kind, Ctx);
+  const MCSymbolRefExpr *MCSym = MCSymbolRefExpr::create(Symbol, Ctx);
 
   if (!Offset)
     return MCOperand::createExpr(MCSym);

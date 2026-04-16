@@ -33,7 +33,7 @@
                 -DLLVM_TARGETS_TO_BUILD=Patmos \
                 -DLLVM_DEFAULT_TARGET_TRIPLE=patmos-unknown-unknown-elf \
                 -DLLVM_ENABLE_PROJECTS="clang;lld" \
-                -DCLANG_ENABLE_ARCMT=false \
+                -DCLANG_ENABLE_OBJC_REWRITER=false \
                 -DCLANG_ENABLE_STATIC_ANALYZER=false \
                 -DCLANG_BUILD_EXAMPLES=false \
                 -DLLVM_ENABLE_BINDINGS=false \

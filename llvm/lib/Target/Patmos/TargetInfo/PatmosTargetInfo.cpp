@@ -14,6 +14,7 @@
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include <optional> // https://llvm.org/docs/CodingStandards.html

@@ -111,12 +111,12 @@ namespace {
     }
 
     ScheduleDAGInstrs *
-    createMachineScheduler(MachineSchedContext *C) const override {
+    createMachineScheduler(MachineSchedContext *C) const {
       return createPatmosVLIWMachineSched(C);
     }
 
     ScheduleDAGInstrs *
-    createPostMachineScheduler(MachineSchedContext *C) const override {
+    createPostMachineScheduler(MachineSchedContext *C) const {
       llvm_unreachable("unimplemented");
     }
 
@@ -131,7 +131,7 @@ namespace {
     bool addPreISel() override {
       if (PatmosSinglePathInfo::isEnabled()) {
         // Single-path transformation requires a single exit node
-        addPass(createUnifyFunctionExitNodesPass());
+        // addPass(createUnifyFunctionExitNodesPass()); // Removed in recent LLVM versions!
         // Single-path transformation currently cannot deal with
         // switch/jumptables -> lower them to ITEs
         addPass(createLowerSwitchPass());
@@ -151,7 +151,10 @@ namespace {
       // For -O0, add a pass that removes dead instructions to avoid issues
       // with spill code in naked functions containing function calls with
       // unused return values.
-      if (getOptLevel() == CodeGenOpt::None) {
+      // Note: addPass no longer accepts a second argument in newer LLVM versions.
+      // The do/while loop with Changed was removed as PatmosEmptyBlockElimID
+      // no longer exists and addPass signature changed.
+      if (getOptLevel() == CodeGenOptLevel::None) {
         addPass(&DeadMachineInstructionElimID);
       }
 
@@ -210,7 +213,8 @@ namespace {
 			// The following is copied from TargetPassConfig::addOptimizedRegAlloc()
 			// with unneeded parts commented out
 
-			addPass(&MachineLoopInfoID, false);
+			// Note: addPass no longer accepts a second argument in newer LLVM versions.
+			addPass(&MachineLoopInfoID);
 //			addPass(&PHIEliminationID, false);
 
 //			addPass(&TwoAddressInstructionPassID, false);
@@ -267,7 +271,8 @@ namespace {
         }
         addPass(createSPSchedulerPass(getPatmosTargetMachine()));
       } else {
-        if (getOptLevel() != CodeGenOpt::None && !DisableIfConverter) {
+        // Note: CodeGenOpt::None was renamed to CodeGenOptLevel::None in newer LLVM.
+        if (getOptLevel() != CodeGenOptLevel::None && !DisableIfConverter) {
           addPass(&IfConverterID);
           // If-converter might create unreachable blocks (bug?), need to be
           // removed before function splitter
@@ -300,7 +305,7 @@ namespace {
       // add passes to handle them.
       if (!getPatmosSubtarget().usePatmosPostRAScheduler(getOptLevel())) {
         addPass(createPatmosDelaySlotFillerPass(getPatmosTargetMachine(),
-                                            getOptLevel() == CodeGenOpt::None));
+                                            getOptLevel() == CodeGenOptLevel::None));
       }
 
       // All passes below this line must handle delay slots and bundles
@@ -331,9 +336,10 @@ namespace {
   };
 } // namespace
 
+// Note: Optional was replaced by std::optional and hasValue() by has_value() in newer LLVM.
 static Reloc::Model getEffectiveRelocModel(bool JIT,
-                                           Optional<Reloc::Model> RM) {
-  if (!RM.hasValue() || JIT)
+                                           std::optional<Reloc::Model> RM) {
+  if (!RM.has_value() || JIT)
     return Reloc::Static;
   return *RM;
 }
@@ -343,10 +349,11 @@ PatmosTargetMachine::PatmosTargetMachine(const Target &T,
                                          StringRef CPU,
                                          StringRef FS,
                                          const TargetOptions &Options,
-                                         Optional<Reloc::Model> RM,
-                                         Optional<CodeModel::Model> CM,
-                                         CodeGenOpt::Level L, bool JIT)
-  : LLVMTargetMachine(
+                                         std::optional<Reloc::Model> RM,
+                                         std::optional<CodeModel::Model> CM,
+                                         CodeGenOptLevel L, bool JIT)
+  // Note: Base class changed from LLVMTargetMachine to CodeGenTargetMachineImpl in newer LLVM.
+  : CodeGenTargetMachineImpl(
       T,
       // Keep this in sync with clang/lib/Basic/Targets.cpp and
       // compiler-rt/lib/patmos/*.ll
@@ -354,7 +361,8 @@ PatmosTargetMachine::PatmosTargetMachine(const Target &T,
       // types, backend does not support different stack alignment.
       "E-S32-p:32:32:32-i8:8:8-i16:16:16-i32:32:32-i64:32:32-f64:32:32-a0:0:32-s0:32:32-v64:32:32-v128:32:32-n32",
       TT, CPU, FS, Options, getEffectiveRelocModel(JIT, RM), getEffectiveCodeModel(CM, CodeModel::Small), L),
-    Subtarget(TT, CPU, FS, *this, L), TLOF(std::make_unique<PatmosTargetObjectFile>())
+      TLOF(std::make_unique<PatmosTargetObjectFile>()),
+      Subtarget(TT, CPU, FS, *this, L)
 {
   // Ensure temporary labels are preserved for later passes that rely on
   // creating and referring to temporary labels in assembly. Set this in the

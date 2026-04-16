@@ -98,9 +98,12 @@ static cl::opt<PatmosSubtarget::CFLType> PatmosCFLType("mpatmos-cfl",
                                            "Emit only non-delayed branches and calls")
                                 ));
 
+
+// FYI - It's not CodeGenOpt::Level, it's CodeGenOptLevel now!
+
 PatmosSubtarget::PatmosSubtarget(const Triple &TT,
                                  StringRef CPU,
-                                 StringRef FS, const PatmosTargetMachine &TM, CodeGenOpt::Level L) :
+                                 StringRef FS, const PatmosTargetMachine &TM, CodeGenOptLevel L) :
   PatmosGenSubtargetInfo(TT, CPU, CPU, FS), TSInfo(),InstrInfo(new PatmosInstrInfo(TM)),
   FrameLowering(new PatmosFrameLowering(TM,*this, TM.getDataLayout())),
   TLInfo(new PatmosTargetLowering(TM, *this)), OptLevel(L)
@@ -122,10 +125,10 @@ bool PatmosSubtarget::enableBundling() {
   return !DisableVLIW;
 }
 
-bool PatmosSubtarget::hasPostRAScheduler(CodeGenOpt::Level OptLevel) const {
+bool PatmosSubtarget::hasPostRAScheduler(CodeGenOptLevel OptLevel) const {
 
   // TargetPassConfig does not add the PostRA pass for -O0!
-  if (OptLevel == CodeGenOpt::None) return false;
+  if (OptLevel == CodeGenOptLevel::None) return false;
 
   // TODO there are also -disable-post-ra and -post-RA-scheduler flags,
   // which override the default postRA scheduler behavior, be basically ignore
@@ -133,15 +136,15 @@ bool PatmosSubtarget::hasPostRAScheduler(CodeGenOpt::Level OptLevel) const {
   return !DisablePostRA;
 }
 
-bool PatmosSubtarget::usePreRAMIScheduler(CodeGenOpt::Level OptLevel) const {
+bool PatmosSubtarget::usePreRAMIScheduler(CodeGenOptLevel OptLevel) const {
 
-  if (OptLevel == CodeGenOpt::None) return false;
+  if (OptLevel == CodeGenOptLevel::None) return false;
 
   return !DisableMIPreRA;
 }
 
-bool PatmosSubtarget::usePatmosPostRAScheduler(CodeGenOpt::Level OptLevel) const {
-  return hasPostRAScheduler(OptLevel) && !DisablePatmosPostRA;
+bool PatmosSubtarget::usePatmosPostRAScheduler(CodeGenOptLevel OptLevel) const {
+  return OptLevel != CodeGenOptLevel::None && !DisablePatmosPostRA;
 }
 
 PatmosSubtarget::CFLType PatmosSubtarget::getCFLType() const {

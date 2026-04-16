@@ -35,7 +35,7 @@ using namespace llvm;
 #include "PatmosGenDFAPacketizer.inc"
 
 PatmosInstrInfo::PatmosInstrInfo(const PatmosTargetMachine &tm)
-  : PatmosGenInstrInfo(Patmos::ADJCALLSTACKDOWN, Patmos::ADJCALLSTACKUP),
+  : PatmosGenInstrInfo(*tm.getSubtargetImpl(), RI, Patmos::ADJCALLSTACKDOWN, Patmos::ADJCALLSTACKUP),
     PTM(tm), RI(tm, *this), PST(*tm.getSubtargetImpl()) {}
 
 bool PatmosInstrInfo::findCommutedOpIndices(const MachineInstr &MI,
@@ -81,8 +81,8 @@ static bool is_in_class(MachineRegisterInfo &RI, const TargetRegisterClass *rcla
 
 void PatmosInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                   MachineBasicBlock::iterator I, const DebugLoc &DL,
-                                  MCRegister DestReg, MCRegister SrcReg,
-                                  bool KillSrc) const {
+                                  Register DestReg, Register SrcReg, bool KillSrc,
+                                  bool RenamableDest, bool RenamableSrc) const {
   /// We enable this function to work with virtual registers too (even though it usually shouldn't)
   /// because single-path will need to be able to call ExpandPostRAPseudosID on virtual predicate registers
   auto &RI = MBB.getParent()->getRegInfo();
@@ -127,7 +127,8 @@ void PatmosInstrInfo::
 storeRegToStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
                     Register SrcReg, bool isKill, int FrameIdx,
                     const TargetRegisterClass *RC,
-                    const TargetRegisterInfo *TRI) const
+                    Register VReg,
+                    MachineInstr::MIFlag Flags) const
 {
   // Do not emit anything for naked functions
   if (MBB.getParent()->getFunction().hasFnAttribute(Attribute::Naked)) {
@@ -172,7 +173,9 @@ void PatmosInstrInfo::
 loadRegFromStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
                      Register DestReg, int FrameIdx,
                      const TargetRegisterClass *RC,
-                     const TargetRegisterInfo *TRI) const
+                     Register VReg,
+                     unsigned SubReg,
+                     MachineInstr::MIFlag Flags) const
 {
   // Do not emit anything for naked functions
   if (MBB.getParent()->getFunction().hasFnAttribute(Attribute::Naked)) {
@@ -207,7 +210,7 @@ loadRegFromStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
   }
 }
 
-unsigned PatmosInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
+Register PatmosInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
                                              int &FrameIndex) const {
   // stack stores still go through cache at this point
   if (MI.getOpcode() == Patmos::SWC ||
@@ -219,10 +222,10 @@ unsigned PatmosInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
       return MI.getOperand(4).getReg();
     }
   }
-  return 0;
+  return Register();
 }
 
-unsigned PatmosInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
+Register PatmosInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
                                               int &FrameIndex) const {
   // stack loads still go through cache at this point
   if (MI.getOpcode() == Patmos::LWC ||
@@ -234,7 +237,7 @@ unsigned PatmosInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
       return MI.getOperand(0).getReg();
     }
   }
-  return 0;
+  return Register();
 }
 
 void PatmosInstrInfo::insertNoop(MachineBasicBlock &MBB,
@@ -720,16 +723,16 @@ PatmosInstrInfo::createPatmosInstrAnalyzer(MCContext &Ctx,
   // PTM.getTargetLowering()->getObjFileLowering() might not yet be
   // initialized, so we create a new section object for this temp context
   MCSection* TS = Ctx.getELFSection(".text", ELF::SHT_PROGBITS, 0);
-  PIA->SwitchSection(TS);
+  // Typo change... lmao... this LLVM... it's 11PM... I am losing me miiiiiiiiiiiind.
+  PIA->switchSection(TS);
 
   return PIA;
 }
 
 unsigned int PatmosInstrInfo::getInstrSize(const MachineInstr *MI) const {
   if (MI->isInlineAsm()) {
-    PatmosAsmPrinter PAP((PatmosTargetMachine&)PTM,
+    PatmosAsmPrinter PAP(const_cast<PatmosTargetMachine&>(PTM),
         createPatmosInstrAnalyzer(MI->getMF()->getContext(), *PTM.getInstrInfo()));
-    PAP.setMachineModuleInfo(&MI->getMF()->getMMI());
 
     // This call will parse the inline asm and emit each instruction through PatmosInstrAnalyzer.
     // PatmosInstrAnalyzer doesn't actually emit the instructions, instead it just sums their sizes.
@@ -931,7 +934,7 @@ bool PatmosInstrInfo::canIssueInSlot(const MachineInstr *MI,
   return canIssueInSlot(MI->getDesc(), Slot);
 }
 
-int PatmosInstrInfo::getOperandLatency(const InstrItineraryData *ItinData,
+std::optional<unsigned> PatmosInstrInfo::getOperandLatency(const InstrItineraryData *ItinData,
                               const MachineInstr &DefMI, unsigned DefIdx,
                               const MachineInstr &UseMI,
                               unsigned UseIdx) const
@@ -939,7 +942,7 @@ int PatmosInstrInfo::getOperandLatency(const InstrItineraryData *ItinData,
   if (UseMI.isInlineAsm()) {
     // For inline asm we do not have a use cycle for our operands, so we use
     // the default def latency instead.
-    return getDefOperandLatency(ItinData, DefMI, DefIdx);
+    return static_cast<unsigned>(getDefOperandLatency(ItinData, DefMI, DefIdx));
   }
 
   return TargetInstrInfo::getOperandLatency(ItinData, DefMI, DefIdx,
@@ -951,7 +954,7 @@ int PatmosInstrInfo::getDefOperandLatency(const InstrItineraryData *ItinData,
                                           unsigned DefIdx) const
 {
   unsigned DefClass = DefMI.getDesc().getSchedClass();
-  int Latency = ItinData->getOperandCycle(DefClass, DefIdx);
+  int Latency = ItinData->getOperandCycle(DefClass, DefIdx).value_or(-1);
 
   const MachineOperand &MO = DefMI.getOperand(DefIdx);
 

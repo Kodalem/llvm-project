@@ -219,7 +219,7 @@ PatmosRegisterInfo::expandPseudoPregInstr(MachineBasicBlock::iterator II,
 }
 
 
-void
+bool
 PatmosRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                         int SPAdj, unsigned FIOperandNum,
                                         RegScavenger *RS) const
@@ -341,7 +341,10 @@ PatmosRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   if ( opcode==Patmos::PSEUDO_PREG_SPILL ||
        opcode==Patmos::PSEUDO_PREG_RELOAD ) {
       expandPseudoPregInstr(II, Offset, BasePtr, isOnStackCache);
-      return;
+      // expandPseudoPregInstr erases the pseudo instruction, so the iterator
+      // is no longer valid. Return true to indicate the instruction was
+      // removed as per TargetRegisterInfo::eliminateFrameIndex.
+      return true;
   }
 
   // do we need to rewrite the instruction opcode?
@@ -369,6 +372,7 @@ PatmosRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   // update the instruction's operands
   MI.getOperand(FIOperandNum).ChangeToRegister(BasePtr, false, false, computedLargeOffset);
   MI.getOperand(FIOperandNum+1).ChangeToImmediate(Offset);
+  return false;
 }
 
 Register PatmosRegisterInfo::getFrameRegister(const MachineFunction &MF) const {
@@ -437,9 +441,10 @@ int PatmosRegisterInfo::getS0Index(unsigned RegNo) const
   return res;
 }
 
-bool PatmosRegisterInfo::isConstantPhysReg(MCRegister PhysReg) const {
-  return PhysReg == Patmos::R0 || PhysReg == Patmos::P0;
-}
+//
+//bool PatmosRegisterInfo::isConstantPhysReg(MCRegister PhysReg) const {
+//  return PhysReg == Patmos::R0 || PhysReg == Patmos::P0;
+//}
 
 raw_ostream &llvm::operator<< (raw_ostream &OS, const llvm::PrintReg &P) {
   if (P.Rs.isValid())
