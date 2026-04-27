@@ -3194,6 +3194,23 @@ def RISCVSystemLibrary
            DefaultStackProtector)>;
 
 //===----------------------------------------------------------------------===//
+// Patmos Runtime Libcalls
+// Had to be added because every target now does this.
+//===----------------------------------------------------------------------===//
+
+def isPatmos : RuntimeLibcallPredicate<"TT.isPatmos()">;
+def patmos___divmodsi4  : RuntimeLibcallImpl<SDIVREM_I32, "__divmodsi4">;
+def patmos___udivmodsi4 : RuntimeLibcallImpl<UDIVREM_I32, "__udivmodsi4">;
+def patmos___divmoddi4  : RuntimeLibcallImpl<SDIVREM_I64, "__divmoddi4">;
+def patmos___udivmoddi4 : RuntimeLibcallImpl<UDIVREM_I64, "__udivmoddi4">;
+
+def PatmosSystemLibrary
+    : SystemRuntimeLibrary<isPatmos,
+      (add DefaultRuntimeLibcallImpls,
+           patmos___divmodsi4, patmos___udivmodsi4,
+           patmos___divmoddi4, patmos___udivmoddi4)>;
+
+//===----------------------------------------------------------------------===//
 // SPARC Runtime Libcalls
 //===----------------------------------------------------------------------===//
 

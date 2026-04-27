@@ -106,13 +106,11 @@ void PatmosAsmPrinter::emitBasicBlockStart(const MachineBasicBlock &MBB) {
   AsmPrinter::emitBasicBlockStart(MBB);
   ((MachineBasicBlock &) MBB).setAlignment(align);
 
-  // We always emit a label for each block using the below format
-  // because 'Platin' needs it in the object file when doing WCET analysis.
-  auto platin_label_string = string_format(".LBB%d_%d", MBB.getParent()->getFunctionNumber(), MBB.getNumber());
-  auto *platin_label = OutContext.getOrCreateSymbol(platin_label_string);
-
-  if(platin_label->isUndefined()){
-    OutStreamer->emitLabel(platin_label);
+  // Always emit a per-block label for Platin WCET analysis. Reuse the
+  // canonical MBB symbol instead of re-creating a .LBB name in MCContext.
+  auto *PlatinLabel = MBB.getSymbol();
+  if (PlatinLabel->isUndefined()) {
+    OutStreamer->emitLabel(PlatinLabel);
   }
 
   emitBasicBlockBegin(MBB);
@@ -284,21 +282,39 @@ bool PatmosAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
   if (ExtraCode && ExtraCode[0])
     return true; // Unknown modifier.
 
-  // Print operand for inline-assembler. Basically the same code as in
-  // PatmosInstPrinter::printOperand, but for MachineOperand and for
-  // inline-assembly. No need for pretty formatting of default ops, output is
-  // for AsmParser only.
+  // Do not lower the whole inline-asm MI here. During size estimation, this
+  // printer can be used without full AsmPrinter/MMI state.
+  const MachineOperand &MO = MI->getOperand(OpNo);
 
-  // TODO any special handling of predicates (flags) or anything?
+  if (MO.isReg()) {
+    OS << "$" << PatmosInstPrinter::getRegisterName(MO.getReg());
+    return false;
+  }
 
-  MCInst MCI;
-  MCInstLowering.Lower(MI, MCI);
+  if (MO.isImm()) {
+    OS << MO.getImm();
+    return false;
+  }
 
-  PatmosInstPrinter PIP(*OutContext.getAsmInfo(), *TM.getMCInstrInfo(),
-                        *TM.getMCRegisterInfo());
+  if (MO.isCImm()) {
+    OS << MO.getCImm()->getSExtValue();
+    return false;
+  }
 
-  PIP.printOperand(&MCI, OpNo, OS);
+  if (MO.isMBB()) {
+    MO.getMBB()->getSymbol()->print(OS, MAI);
+    return false;
+  }
 
+  if (MO.isGlobal() || MO.isBlockAddress()) {
+    // Keep real symbol spelling for normal asm emission paths.
+    PrintSymbolOperand(MO, OS);
+    return false;
+  }
+
+  // Conservative fallback for uncommon inline-asm operand kinds during
+  // size-counting paths.
+  OS << "0";
   return false;
 }
 
@@ -540,6 +556,9 @@ void PatmosAsmPrinter::mockEmitInlineAsmForSizeCount(const MachineInstr *MI) con
   Buffer = MemoryBuffer::getMemBufferCopy(OS.str(), "<inline asm>");
   auto srcMgr = SourceMgr();
   unsigned BufNum = srcMgr.AddNewSourceBuffer(std::move(Buffer), SMLoc());
+
+  // The MC parser expects a current section to be active.
+  OutStreamer->initSections(/*NoExecStack=*/false, *TM.getMCSubtargetInfo());
 
   std::unique_ptr<MCAsmParser> Parser(createMCAsmParser(
       srcMgr, OutContext, *OutStreamer, *MAI, BufNum));

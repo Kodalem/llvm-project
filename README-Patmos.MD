@@ -1,40 +1,3 @@
-
-### INVESTIGATIONS:
-
-/llvm/test/Bindings/Go/lit.local.cfg was yeeeted at 2022 https://discourse.llvm.org/t/rfc-remove-the-go-bindings/65725
-Fix: https://github.com/tinygo-org/go-llvm
-
-handleLoopboundAttr at Sema/SemaAttr.cpp - Whose is it?
-
-Currenrtl using the RISCV target as example to look into how exactly the system will work and what needs to be migrated.
-Check on the LLVM 
-
-Todo, get a fpga board to try and test the code on to determine if shit actually works.
-
-Create the following dummy target files to learn how targetting works in llvm.
-Read the docs about the tablegen code generator.
-
-Cannot use Ferrocene, because is both not open source and they don't actually edit the LLVM, they just use it as a base.
-And update accordingly in upstream LLVM.
-
-[001A] - Means, that you need to ask Emad about this. Use this number in Control-F to find all instances of this.
-
-TableGen stuff first, if you have missing instruction header thingies
-
-```zsh
-
-# Ensure tblgen is built
-make -C build llvm-tblgen
-
-# Ensure that Patmos table instruction thingies are built
-build/bin/llvm-tblgen -gen-instr-info -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenInstrInfo.inc
-make -C build llvm-tblgen && build/bin/llvm-tblgen -gen-register-info -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenRegisterInfo.inc
-cp build/lib/Target/Patmos/PatmosGenRegisterInfo* llvm/lib/Target/Patmos/ 
-build/bin/llvm-tblgen -gen-asm-matcher -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenAsmMatcher.inc
-cp build/lib/Target/Patmos/PatmosGenAsmMatcher.inc llvm/lib/Target/Patmos/
-
-```
-
 Patmos LLVM
 ================
 
@@ -92,7 +55,7 @@ git sparse-checkout add /.github /llvm /clang /compiler-rt /lld /libunwind
 
 ### Build
 
-Ensure all the above reqruirements are met and that the tools are available on the PATH.
+Ensure all the above requirements are met and that the tools are available on the PATH.
 
 Then you must create a build folder.
 This folder doesn't have to be in the LLVM Project root folder, but that is where we will put it in this example.
@@ -248,3 +211,89 @@ git push origin +master
 You have now effectively merged the old Patmos head with the new LLVM release tag.
 The git history will showing as being a merge of the two commits.
 After this, the Patmos code will probably need tweaking to conform to any changes LLVM has made since the last release.
+
+---
+Here are Christine's notes, these notes will be deleted/merged in proper release branch 
+
+### INVESTIGATIONS:
+
+/llvm/test/Bindings/Go/lit.local.cfg was yeeeted at 2022 https://discourse.llvm.org/t/rfc-remove-the-go-bindings/65725
+Fix: https://github.com/tinygo-org/go-llvm
+
+handleLoopboundAttr at Sema/SemaAttr.cpp - Whose is it?
+
+Currenrtl using the RISCV target as example to look into how exactly the system will work and what needs to be migrated.
+Check on the LLVM
+
+Todo, get a fpga board to try and test the code on to determine if shit actually works.
+
+Create the following dummy target files to learn how targetting works in llvm.
+Read the docs about the tablegen code generator.
+
+Cannot use Ferrocene, because is both not open source and they don't actually edit the LLVM, they just use it as a base.
+And update accordingly in upstream LLVM.
+
+[001A] - Means, that you need to ask Emad about this. Use this number in Control-F to find all instances of this.
+
+TableGen stuff first, if you have missing instruction header thingies
+
+```zsh
+
+# Ensure tblgen is built
+make -C build llvm-tblgen
+
+# Ensure that Patmos table instruction thingies are built
+build/bin/llvm-tblgen -gen-instr-info -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenInstrInfo.inc
+make -C build llvm-tblgen && build/bin/llvm-tblgen -gen-register-info -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenRegisterInfo.inc
+cp build/lib/Target/Patmos/PatmosGenRegisterInfo* llvm/lib/Target/Patmos/ 
+build/bin/llvm-tblgen -gen-asm-matcher -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenAsmMatcher.inc
+cp build/lib/Target/Patmos/PatmosGenAsmMatcher.inc llvm/lib/Target/Patmos/
+
+```
+
+What the hecc to do next...
+
+```
+
+# 0) Find first real blocker
+./build/bin/llvm-lit llvm/test/CodeGen/Patmos/ -j1 -sv --max-failures=1
+
+# 1) Reproduce just that test
+./build/bin/llvm-lit llvm/test/CodeGen/Patmos/<failing-test>.ll -sv
+
+# 2) Rebuild only needed tool fast
+cmake --build build --target llc -j16
+
+# 3) Re-run first-failure scan
+./build/bin/llvm-lit llvm/test/CodeGen/Patmos/ -j1 -sv --max-failures=1
+
+# 4) How to manually debug command (check .ll file for the exact flags)
+./build/bin/llc -march=patmos < ./llvm/test/CodeGen/Patmos/flags/mpatmos-subfunction-align/align_multiple_subfunctions.ll
+
+```
+
+How to compile the stuff later:
+```
+
+# 0) This is how to compile the code
+./build/bin/clang++ --target=patmos-unknown-unknown-elf -O0 -c ./fibonacci-test.cpp -o ./fibonacci-test.o
+
+# 1) This is how to object dump the code
+./build/bin/llvm-objdump -d ./fibonacci-test.o 
+
+```
+
+## Extra flags
+
+`-mpatmos-skip-postra-scheduler` is possible to use to skip Patmos post-RA scheduling to avoid reg-unit assertions. Default is `false` 
+but for whatever reason you might need it, there's an option for that. This was initially used to analyze crash issues during compiling to
+eliminate red-herrings.
+
+## Note, apparently pasim needs to be installed to run the LLVM tests...
+(WHY WASNT THIS DOCUMENTED, TODO, ADD A ERROR MESSAGE WHERE IT ASKS PEOPLE THAT THEY MUST INSTALL IT)
+
+
+LLVM Requiring stricter physical register live-li-ness and stronger typed calling
+is going to be the eeeeeend of meeeeeeee.
+
+/Users/christineek/CLionProjects/patmos-llvm-project/llvm/test/CodeGen/Patmos/programs/bounded/single_source/instruction_combinations/trunc_to_br_condition.ll

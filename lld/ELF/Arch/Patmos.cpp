@@ -11,6 +11,7 @@
 #include "Symbols.h"
 #include "SyntheticSections.h"
 #include "Target.h"
+#include "llvm/Support/MathExtras.h"
 
 using namespace llvm;
 using namespace llvm::object;
@@ -23,16 +24,17 @@ namespace {
 
 class Patmos final : public TargetInfo {
 public:
-  Patmos();
+  Patmos(Ctx &ctx);
   RelExpr getRelExpr(RelType type, const Symbol &s,
                      const uint8_t *loc) const override;
+  int64_t getImplicitAddend(const uint8_t *buf, RelType type) const override;
   void relocate(uint8_t *loc, const Relocation &rel,
                 uint64_t val) const override;
 };
 
 }
 
-Patmos::Patmos() {
+Patmos::Patmos(Ctx &ctx) : TargetInfo(ctx) {
   defaultImageBase = 0x00020000;
   
   defaultMaxPageSize = 0x1000;
@@ -67,8 +69,9 @@ RelExpr Patmos::getRelExpr(const RelType type, const Symbol &s,
   case R_PATMOS_CFLI_PCREL:
     return R_PC; // Relative Address
   default:
-    error(getErrorLocation(loc) + "unknown relocation (" + Twine(type) +
-          ") against symbol " + toString(s));
+    // Damn LLVM syntax updates! To heck!
+    Err(ctx) << getErrorLoc(ctx, loc) << "unknown relocation (" << type.v
+             << ") against symbol " << &s;
     return R_NONE;
   }
 }
@@ -76,6 +79,33 @@ RelExpr Patmos::getRelExpr(const RelType type, const Symbol &s,
 // Extract bits V[Begin:End], where range is inclusive, and Begin must be < 63.
 static uint32_t extractBits(uint64_t v, uint32_t begin, uint32_t end) {
   return (v & ((1ULL << (begin + 1)) - 1)) >> end;
+}
+
+int64_t Patmos::getImplicitAddend(const uint8_t *buf, RelType type) const {
+  switch (type) {
+  case R_PATMOS_NONE:
+    return 0;
+  case R_PATMOS_CFLI_ABS:
+    return static_cast<int64_t>(read32be(buf) & 0x3FFFFF) << 2;
+  case R_PATMOS_CFLI_PCREL: {
+    int64_t imm = SignExtend64<22>(read32be(buf) & 0x3FFFFF);
+    return imm << 2;
+  }
+  case R_PATMOS_ALUI_ABS:
+    return read32be(buf) & 0xFFF;
+  case R_PATMOS_ALUL_ABS:
+    return static_cast<int64_t>(read64be(buf) & 0xFFFFFFFFULL);
+  case R_PATMOS_MEMB_ABS:
+    return read32be(buf) & 0x7F;
+  case R_PATMOS_MEMH_ABS:
+    return static_cast<int64_t>(read32be(buf) & 0x7F) << 1;
+  case R_PATMOS_MEMW_ABS:
+    return static_cast<int64_t>(read32be(buf) & 0x7F) << 2;
+  case R_PATMOS_ABS_32:
+    return read32be(buf);
+  default:
+    return TargetInfo::getImplicitAddend(buf, type);
+  }
 }
 
 
@@ -88,8 +118,7 @@ void Patmos::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   
   switch (rel.type) {
   case R_PATMOS_CFLI_ABS: {
-    // Relocate CFLi format (22 bit immediate), absolute (unsigned), in words
-    checkUInt(loc, static_cast<int64_t>(val) >> 2, 22, rel);
+    checkUInt(ctx, loc, static_cast<int64_t>(val) >> 2, 22, rel);
 
     const uint32_t mask = 0x3FFFFF;
     uint32_t insn = read32be(loc) & ~(mask);
@@ -99,8 +128,7 @@ void Patmos::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
     return;
   }
   case R_PATMOS_ALUI_ABS: {
-    // Relocate ALIi format (12 bit immediate), absolute (unsigned), in bytes
-    checkUInt(loc, static_cast<int64_t>(val), 12, rel);
+    checkUInt(ctx, loc, static_cast<int64_t>(val), 12, rel);
 
     const uint32_t mask = 0xFFF;
     uint32_t insn = read32be(loc) & ~(mask);
@@ -110,8 +138,7 @@ void Patmos::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
     return;
   }
   case R_PATMOS_ALUL_ABS: {
-    // Relocate ALUl format (32 bti immediate), absolute (unsigned), in bytes
-    checkUInt(loc, static_cast<int64_t>(val), 32, rel);
+    checkUInt(ctx, loc, static_cast<int64_t>(val), 32, rel);
 
     const uint64_t mask = 0xFFFFFFFF;
     uint64_t insn = read64be(loc) & ~(mask);
@@ -121,8 +148,7 @@ void Patmos::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
     return;
   }
   case R_PATMOS_MEMB_ABS:{
-    // Relocate LDT or STT format (7 bit immediate), absolute, signed, in bytes
-    checkInt(loc, static_cast<int64_t>(val), 7, rel);
+    checkInt(ctx, loc, static_cast<int64_t>(val), 7, rel);
 
     const uint64_t mask = 0x7F;
     uint32_t insn = read32be(loc) & ~(mask);
@@ -133,7 +159,7 @@ void Patmos::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   }
   case R_PATMOS_MEMH_ABS:{
     // Relocate LDT or STT format (7 bit immediate), absolute, signed, in half-words
-    checkInt(loc, static_cast<int64_t>(val) >> 1, 7, rel);
+    checkInt(ctx, loc, static_cast<int64_t>(val) >> 1, 7, rel);
 
     const uint64_t mask = 0x7F;
     uint32_t insn = read32be(loc) & ~(mask);
@@ -144,7 +170,7 @@ void Patmos::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   }
   case R_PATMOS_MEMW_ABS:{
     // Relocate LDT or STT format (7 bit immediate), absolute, signed, in words
-    checkInt(loc, static_cast<int64_t>(val) >> 2, 7, rel);
+    checkInt(ctx, loc, static_cast<int64_t>(val) >> 2, 7, rel);
 
     const uint64_t mask = 0x7F;
     uint32_t insn = read32be(loc) & ~(mask);
@@ -155,13 +181,13 @@ void Patmos::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   }
   case R_PATMOS_ABS_32: {
     // Relocate 32 bit word, absolute (unsigned), in bytes
-    checkUInt(loc, static_cast<int64_t>(val), 32, rel);
-    
+    checkUInt(ctx, loc, static_cast<int64_t>(val), 32, rel);
+
     uint64_t out =  read32be(loc);
     uint32_t temp =  extractBits(val, 31, 0);
     out += temp;
 
-    checkIntUInt(loc, out, 32, rel);
+    checkIntUInt(ctx, loc, out, 32, rel);
 
     write32be(loc,out);
     
@@ -169,7 +195,7 @@ void Patmos::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   }
   case R_PATMOS_CFLI_PCREL: {
     // Relocate CFLi format (22 bit immediate), PC relative (signed), in words
-    checkInt(loc, static_cast<int64_t>(val) >> 2, 22, rel);
+    checkInt(ctx, loc, static_cast<int64_t>(val) >> 2, 22, rel);
 
     const uint32_t mask = 0x3FFFFF;
     uint32_t insn = read32be(loc) & ~(mask);
@@ -183,7 +209,4 @@ void Patmos::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   }
 }
 
-TargetInfo *elf::getPatmosTargetInfo() {
-  static Patmos target;
-  return &target;
-}
+void elf::setPatmosTargetInfo(Ctx &ctx) { ctx.target.reset(new Patmos(ctx)); }

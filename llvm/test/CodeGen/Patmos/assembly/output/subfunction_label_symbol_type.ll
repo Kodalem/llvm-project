@@ -1,5 +1,5 @@
 ; RUN: llc < %s -mpatmos-max-subfunction-size=64 | FileCheck %s
-; RUN: llc < %s -mpatmos-max-subfunction-size=64 -filetype=obj -o %t --basic-block-sections=labels;\
+; RUN: llc < %s -mpatmos-max-subfunction-size=64 -filetype=obj -o %t -basic-block-address-map;\
 ; RUN: llvm-objdump %t -d -t | FileCheck %s --check-prefix OBJ
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////

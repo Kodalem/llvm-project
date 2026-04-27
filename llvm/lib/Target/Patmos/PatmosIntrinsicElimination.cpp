@@ -82,7 +82,21 @@ static void eliminate(
 
   auto *i_cmp = builder.CreateICmpEQ(i_phi, ConstantInt::get(builder.getInt32Ty(), 0), label_prefix + ".loop.finished");
 
-  // Set loop bound for generated loop
+  // Set loop bound for generated loop.
+  // NOTE: [001A] - Is this a good idea?
+  // The inner loop runs exactly `loop_bound` times (i_phi counts down from
+  // loop_bound to 0, with the condition checked at the TOP of each iteration;
+  // the header is therefore visited loop_bound+1 times — loop_bound latch
+  // takings plus one final exit-check when i_phi == 0).
+  //
+  // llvm.loop.bound(A, B) encodes min = A+1, max = A+1+B (see getLoopBounds).
+  // For a constant loop of exactly N executions of the BODY we need
+  // min = max = N+1 (N latch-takings), so A = N, B = 0.
+  //
+  // The old code passed {loop_bound, loop_bound} which yielded max = 2*N+1,
+  // causing MemoryAccessNormalization to over-count inner-loop accesses and
+  // insert wrong CET counter compensation, breaking constant-time execution
+  // when these inner loops are nested inside a variable outer loop.
   auto *loop_bound_fn = F.getParent()->getFunction("llvm.loop.bound");
   if(!loop_bound_fn) {
     // Loop bound function not declared yet. Declare it.
@@ -90,7 +104,11 @@ static void eliminate(
     FunctionType *FT = FunctionType::get(Type::getVoidTy(F.getContext()), BoundTypes, false);
     loop_bound_fn = Function::Create(FT, Function::ExternalLinkage, "llvm.loop.bound", F.getParent());
   }
-  builder.CreateCall(loop_bound_fn, {builder.getInt32(loop_bound), builder.getInt32(loop_bound)});
+  // NOTE: [001A] - Did I understand this correctly?
+  // loop_bound > 0 is guaranteed: eliminate_mem_intrinsic only reaches here
+  // when len > 12, so loop_bound = len/increment >= 3 for increment=4 and
+  // >= 13 for increment=1.
+  builder.CreateCall(loop_bound_fn, {builder.getInt32(loop_bound), builder.getInt32(0)});
 
   auto *cond_br = BranchInst::Create(memset_loop_end, memset_loop_body, i_cmp, memset_loop_cond);
 

@@ -10,9 +10,10 @@
 #define LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_PATMOS_H
 
 #include "Gnu.h"
-#include "clang/Driver/ToolChain.h"
 #include "Clang.h"
-#include "llvm/BinaryFormat/Magic.h"
+#include "clang/Driver/Compilation.h"
+#include "clang/Driver/Driver.h"
+#include "clang/Driver/ToolChain.h"
 
 namespace clang {
 namespace driver {
@@ -27,8 +28,9 @@ public:
                  const llvm::opt::ArgList &Args);
 
   bool IsIntegratedAssemblerDefault() const override { return true; }
-  bool IsUnwindTablesDefault(const llvm::opt::ArgList &Args) const override {
-    return false;
+  UnwindTableLevel
+  getDefaultUnwindTableLevel(const llvm::opt::ArgList &Args) const override {
+    return UnwindTableLevel::None;
   }
   bool SupportsProfiling() const override { return false; }
   bool isPICDefault() const override { return false; }

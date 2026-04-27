@@ -276,6 +276,8 @@ PatmosMCCodeEmitter::addSymbolRefFixups(const MCInst &MI, const MCOperand& MO,
     break;
   case PatmosII::FrmALUl:
     FixupKind = FK_Patmos_abs_ALUl;
+    // Otherwise it SEGFAULTS (checked how RISCV and X86 does it)
+    Offset = 0;
     break;
   default:
     // TODO proper way to throw an error?

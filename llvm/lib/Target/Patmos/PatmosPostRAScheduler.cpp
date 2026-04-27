@@ -70,12 +70,82 @@ EnableAntiDepBreaking("mpatmos-break-anti-dependencies",
                                "\"critical\", \"all\", or \"none\""),
                       cl::Hidden);
 
+static cl::opt<bool>
+SkipPostRASchedulerCrashWorkaround("mpatmos-skip-postra-scheduler",
+                                   cl::desc("Temporarily skip Patmos post-RA "
+                                            "scheduling to avoid reg-unit "
+                                            "assertions"),
+                                    cl::Hidden, cl::init(false));
+
 
 // DAG subtrees must have at least this many nodes.
 static const unsigned MinSubtreeSize = 8;
 
 
 namespace {
+
+  static bool hasInvalidPhysRegUnits(const MachineFunction &MF) {
+    const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
+    const unsigned NumRegs = TRI->getNumRegs();
+    const unsigned NumRegUnits = TRI->getNumRegUnits();
+
+    for (const MachineBasicBlock &MBB : MF) {
+      for (const MachineInstr &MI : MBB) {
+        for (const MachineOperand &MO : MI.operands()) {
+          if (!MO.isReg())
+            continue;
+
+          Register R = MO.getReg();
+          if (!R || !R.isPhysical())
+            continue;
+
+          if (R.id() >= NumRegs)
+            return true;
+
+          for (MCRegUnit Unit : TRI->regunits(R)) {
+            if (static_cast<unsigned>(Unit) >= NumRegUnits)
+              return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  static bool hasRegMaskOperand(const MachineFunction &MF) {
+    for (const MachineBasicBlock &MBB : MF)
+      for (const MachineInstr &MI : MBB)
+        for (const MachineOperand &MO : MI.operands())
+          if (MO.isRegMask())
+            return true;
+    return false;
+  }
+
+  static bool hasInvalidRegMaskUnits(const MachineFunction &MF) {
+    const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
+    const unsigned NumRegs = TRI->getNumRegs();
+    const unsigned NumRegUnits = TRI->getNumRegUnits();
+
+    for (const MachineBasicBlock &MBB : MF) {
+      for (const MachineInstr &MI : MBB) {
+        for (const MachineOperand &MO : MI.operands()) {
+          if (!MO.isRegMask())
+            continue;
+
+          for (unsigned Reg = 1; Reg < NumRegs; ++Reg) {
+            if (!MO.clobbersPhysReg(Reg))
+              continue;
+
+            for (MCRegUnit Unit : TRI->regunits(MCRegister::from(Reg))) {
+              if (static_cast<unsigned>(Unit) >= NumRegUnits)
+                return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
 
   class PatmosPostRAScheduler : public PostRASchedContext,
                                 public MachineFunctionPass {
@@ -161,6 +231,36 @@ bool PatmosPostRAScheduler::runOnMachineFunction(MachineFunction &mf) {
     LLVM_DEBUG( dbgs() << "********** PatmosPostRAScheduler disabled **********\n");
     return false;
   }
+
+  if (SkipPostRASchedulerCrashWorkaround) {
+    LLVM_DEBUG(dbgs() << "********** Skipping PatmosPostRAScheduler on '"
+                      << mf.getName()
+                      << "' due to temporary crash workaround **********\n");
+    finalizeBundles(mf);
+    return true;
+  }
+
+  // Guard against malformed physreg/regunit data that can crash DAG building.
+  // Keep this narrowly targeted (do not skip on mere regmasks).
+  if (hasInvalidPhysRegUnits(mf)) {
+    LLVM_DEBUG(dbgs() << "********** Skipping PatmosPostRAScheduler on '"
+                      << mf.getName()
+                      << "' due to invalid physical register/regunit data **********\n");
+    finalizeBundles(mf);
+    return true;
+  }
+
+  if (hasInvalidRegMaskUnits(mf)) {
+    LLVM_DEBUG(dbgs() << "********** Skipping PatmosPostRAScheduler on '"
+                      << mf.getName()
+                      << "' due to invalid regmask regunit data **********\n");
+    finalizeBundles(mf);
+    return true;
+  }
+
+  LLVM_DEBUG(if (hasRegMaskOperand(mf))
+               dbgs() << "Info: regmask operands seen in '" << mf.getName()
+                      << "'\n");
 
   LLVM_DEBUG( dbgs() << "\n********** Running PatmosPostRAScheduler **********\n");
   LLVM_DEBUG( dbgs() << "********** Function:" << mf.getName() << "\n");
@@ -345,6 +445,13 @@ bool ScheduleDAGPostRA::isSchedulingBoundary(const MachineInstr *MI,
                                             const MachineBasicBlock *MBB,
                                             const MachineFunction &MF)
 {
+  // Keep regmask-bearing instructions out of scheduling regions.
+  // On newer LLVM, including them here can trip reg-unit assertions in
+  // ScheduleDAGInstrs::addPhysRegDeps for some Patmos regmasks.
+  for (const MachineOperand &MO : MI->operands()) {
+    if (MO.isRegMask())
+      return true;
+  }
   return SchedImpl->isSchedulingBoundary(MI, MBB, MF);
 }
 

@@ -101,6 +101,13 @@ void PatmosFrameLowering::assignFIsToStackCache(MachineFunction &MF,
 
   assert(MFI.isCalleeSavedInfoValid());
 
+  auto setSCFI = [&](int fi) {
+    if (fi >= 0) {
+      if ((unsigned)fi >= SCFIs.size()) SCFIs.resize(fi + 1);
+      SCFIs[fi] = true;
+    }
+  };
+
   // find all FIs used for callee saved registers
   for(std::vector<CalleeSavedInfo>::const_iterator i(CSI.begin()),
       ie(CSI.end()); i != ie; i++)
@@ -109,18 +116,18 @@ void PatmosFrameLowering::assignFIsToStackCache(MachineFunction &MF,
     // Predicates are handled via aliasing to S0. They appear here when we
     // skip assigning s0 to a stack slot, not really sure why.
     if (TRI->getRegClass(Patmos::PRegsRegClassID)->contains(i->getReg())) continue;
-    SCFIs[i->getFrameIdx()] = true;
+    setSCFI(i->getFrameIdx());
   }
 
   // RegScavenging register
   if (TRI->requiresRegisterScavenging(MF)) {
-    SCFIs[PMFI.getRegScavengingFI()] = true;
+    setSCFI(PMFI.getRegScavengingFI());
   }
 
   // Spill slots / storage introduced for single path conversion
   const std::vector<int> &SinglePathFIs = PMFI.getSinglePathFIs();
   for(unsigned i=0; i<SinglePathFIs.size(); i++) {
-    SCFIs[SinglePathFIs[i]] = true;
+    setSCFI(SinglePathFIs[i]);
   }
 
   // find all FIs that are spill slots
@@ -130,7 +137,7 @@ void PatmosFrameLowering::assignFIsToStackCache(MachineFunction &MF,
 
     // find all spill slots and locations for callee saved registers
     if (MFI.isSpillSlotObjectIndex(FI))
-      SCFIs[FI] = true;
+      setSCFI(FI);
   }
 }
 
@@ -340,10 +347,15 @@ void PatmosFrameLowering::emitPrologue(MachineFunction &MF, MachineBasicBlock &M
 
 void PatmosFrameLowering::emitEpilogue(MachineFunction &MF,
                                        MachineBasicBlock &MBB) const {
-  MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
+  MachineBasicBlock::iterator MBBI = MBB.end();
+  DebugLoc dl;
+  if (!MBB.empty()) {
+    MBBI = MBB.getFirstTerminator();
+    if (MBBI != MBB.end())
+      dl = MBBI->getDebugLoc();
+  }
   MachineFrameInfo &MFI            = MF.getFrameInfo();
   const TargetInstrInfo *TII       = STC.getInstrInfo();
-  DebugLoc dl                      = MBBI->getDebugLoc();
 
   //----------------------------------------------------------------------------
   // Handle Stack Cache

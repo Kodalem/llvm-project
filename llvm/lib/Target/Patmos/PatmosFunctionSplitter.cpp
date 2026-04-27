@@ -1896,7 +1896,12 @@ namespace llvm {
 
       for (; cycles > 0; ) {
         it++;
-        assert(it != MBB->end() && "Reached end of MBB before end of delay slot");
+        if (it == MBB->end()) {
+          // Be conservative for size estimation: missing delay-slot
+          // instructions are treated as inserted 4-byte nops.
+          bytes += static_cast<unsigned>(cycles) * 4;
+          break;
+        }
         assert(!it->isInlineAsm() && "Inline asm should not be in delay slot");
 
         if (!PII->isPseudo(&*it)) {

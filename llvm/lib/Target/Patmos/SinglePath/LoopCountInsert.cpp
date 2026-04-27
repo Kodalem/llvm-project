@@ -127,6 +127,15 @@ void LoopCountInsert::doFunction(MachineFunction &MF){
 		assert(header_mbb_position != MF.end());
 		MF.insert(header_mbb_position, preheader);
 
+		// LLVM22 performs stricter physical-register liveness validation.  Later
+		// single-path passes may rely on P7 being globally available as the
+		// function enable predicate. Newly created loop helper blocks must inherit
+		// that contract, otherwise LiveIntervals can fail with missing P7 live-ins.
+		if (PatmosSinglePathInfo::useNewSinglePathTransform()) {
+			MF.addLiveIn(Patmos::P7, &Patmos::PRegsRegClass);
+			preheader->addLiveIn(Patmos::P7);
+		}
+
 		// Redirect loop predecessors
 		for(auto pred_iter = header_mbb.pred_begin(); pred_iter != header_mbb.pred_end();)
 		{
@@ -148,6 +157,9 @@ void LoopCountInsert::doFunction(MachineFunction &MF){
 		// We put the unilatch before the header
 		assert(header_mbb_position != MF.end());
 		MF.insert(header_mbb_position, unilatch);
+		if (PatmosSinglePathInfo::useNewSinglePathTransform()) {
+			unilatch->addLiveIn(Patmos::P7);
+		}
 		BuildMI(*unilatch, unilatch->end(), DL,
 			TII->get(Patmos::BRu))
 			.addReg(Patmos::NoRegister).addImm(0)

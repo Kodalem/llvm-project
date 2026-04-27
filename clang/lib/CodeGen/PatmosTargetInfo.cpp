@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TargetInfo.h"
-#include "ABIInfo.h"
+#include "ABIInfoImpl.h"
 #include "CodeGenModule.h"
 #include "CodeGenTypes.h"
 #include "clang/AST/Decl.h"

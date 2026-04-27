@@ -7515,6 +7515,11 @@ public:
                                  ParsedAttributes &Attrs,
                                  LabelDecl *PrecedingLabel);
 
+  StmtResult ParsePragmaLoopbound(StmtVector &Stmts, ParsedStmtContext StmtCtx,
+                                  SourceLocation *TrailingElseLoc,
+                                  ParsedAttributes &Attrs,
+                                  LabelDecl *PrecedingLabel);
+
   void ParseMicrosoftIfExistsStatement(StmtVector &Stmts);
 
   //===--------------------------------------------------------------------===//

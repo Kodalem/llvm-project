@@ -32,8 +32,8 @@
 #include "ToolChains/LFILinux.h"
 #include "ToolChains/Lanai.h"
 #include "ToolChains/Linux.h"
-#include "ToolChains/MSP430.h"
-#include "ToolChains/MSVC.h"
+// #include "ToolChains/MSP430.h"  // Disabled for now
+// #include "ToolChains/MSVC.h"    // Disabled for now
 #include "ToolChains/Managarm.h"
 #include "ToolChains/MinGW.h"
 #include "ToolChains/MipsLinux.h"
@@ -6939,7 +6939,7 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
               *this, Target, Args);
         else
           TC =
-              std::make_unique<toolchains::MSVCToolChain>(*this, Target, Args);
+              std::make_unique<toolchains::CrossWindowsToolChain>(*this, Target, Args);
         break;
       }
       break;
@@ -6990,7 +6990,7 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
         TC = std::make_unique<toolchains::AVRToolChain>(*this, Target, Args);
         break;
       case llvm::Triple::msp430:
-        TC = std::make_unique<toolchains::MSP430ToolChain>(*this, Target, Args);
+        TC = std::make_unique<toolchains::BareMetal>(*this, Target, Args);
         break;
       case llvm::Triple::riscv32:
       case llvm::Triple::riscv64:

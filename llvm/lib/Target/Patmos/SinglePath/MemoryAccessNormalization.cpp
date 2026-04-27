@@ -44,6 +44,40 @@ char MemoryAccessNormalization::ID = 0;
 FunctionPass *llvm::createMemoryAccessNormalizationPass(const PatmosTargetMachine &tm) {
   return new MemoryAccessNormalization(tm);
 }
+// NOTE: [001A] - Is this a good idea?
+/// Returns true if the function contains any narrow-width (byte or halfword)
+/// main-memory accesses alongside word-width accesses, OR if it contains ONLY
+/// narrow-width accesses.
+///
+/// The counter-compensation algorithm equalises "number of accesses" by running
+/// a loop of LWM (word load) operations in __patmos_main_mem_access_compensation.
+/// A single main-memory access is assumed to cost the same number of cycles
+/// regardless of whether the real instruction is LWM, LBM, SBM, etc.  In
+/// practice this holds only for word-width operations; byte/halfword accesses
+/// may have different timing, so the counter cannot guarantee cycle equivalence
+/// when narrow accesses are present.  Opposite-predicate compensation is always
+/// correct in this case because it performs the actual operations on every path.
+static bool hasMixedWidthAccesses(const MachineFunction &MF) {
+  bool hasNarrowAccess = false;
+  for (const auto &MBB : MF) {
+    for (const auto &MI : MBB) {
+      switch (MI.getOpcode()) {
+        case Patmos::LHM:
+        case Patmos::LHUM:
+        case Patmos::LBM:
+        case Patmos::LBUM:
+        case Patmos::SHM:
+        case Patmos::SBM:
+          hasNarrowAccess = true;
+          break;
+        default:
+          break;
+      }
+      if (hasNarrowAccess) return true;
+    }
+  }
+  return false;
+}
 
 /// returns the number of main-memory accessing instruction in the given block
 static unsigned countAccesses(const MachineBasicBlock *mbb){
@@ -148,6 +182,31 @@ bool MemoryAccessNormalization::runOnMachineFunction(MachineFunction &MF) {
       auto max_accesses = accessBounds.second;
 
       if((max_accesses - min_accesses) > 0) {
+        // NOTE: [001A] - Is this a good idea?
+        // Counter compensation equalises cycle counts by running a fixed number
+        // of LWM (word load) instructions in the compensation helper.  This is
+        // only cycle-accurate when every real access in the function also costs
+        // the same number of cycles as an LWM.  Byte and halfword accesses
+        // (LBM, SBM, LHM, SHM, …) may have a different cost model, so fall
+        // back to opposite-predicate compensation which is provably correct for
+        // any access mix.
+        //
+        // This guard applies to both `hybrid` and explicit `counter` mode:
+        // the goal of any CET mode is constant execution TIME, not strict use
+        // of the counter algorithm.  When counter compensation cannot provide
+        // the time guarantee (due to narrow-width accesses), falling back to
+        // opposite-predicate is the correct choice in either mode.
+        const bool narrowAccessesPresent = hasMixedWidthAccesses(MF);
+        if (narrowAccessesPresent) {
+          LLVM_DEBUG(
+            dbgs() << "Function contains narrow (byte/halfword) main-memory accesses; "
+                      "counter compensation cannot guarantee cycle equivalence — "
+                      "delegating to opposite-predicate compensation.\n";
+          );
+          delegateToOppositePredicate(MF);
+          return true;
+        }
+
         auto counter_algo_instr_need = counter_compensate(MF, max_accesses, min_accesses, false);
 
         // Get the number of instructions the opposite predicate compensation algorithm

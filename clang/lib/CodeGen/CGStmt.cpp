@@ -1116,7 +1116,7 @@ void CodeGenFunction::EmitLoopBounds(
     auto *call_inst = llvm::CallInst::Create(FT, loop_bound_fn, {MinVal, MaxVal});
 
     // Emit before terminator
-    BB->getInstList().insertAfter(std::prev(BB->end(),2), call_inst);
+    call_inst->insertBefore(BB->getTerminator()->getIterator());
   }
 }
 

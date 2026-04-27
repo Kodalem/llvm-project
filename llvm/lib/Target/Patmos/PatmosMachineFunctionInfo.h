@@ -120,12 +120,26 @@ class PatmosMachineFunctionInfo : public MachineFunctionInfo {
   // do not provide any default constructor.
   PatmosMachineFunctionInfo();
 public:
+  PatmosMachineFunctionInfo(const Function &F, const TargetSubtargetInfo *STI) :
+    StackCacheReservedBytes(0), StackReservedBytes(0), VarArgsFI(0),
+    RegScavengingFI(0), S0SpillReg(0),
+    SinglePathConvert(false), SinglePathPseudoRoot(false), SPS0SpillOffset(0), SPExcessSpillOffset(0),
+    SPCallSpillOffset(0)
+    {}
+
   explicit PatmosMachineFunctionInfo(MachineFunction &MF) :
     StackCacheReservedBytes(0), StackReservedBytes(0), VarArgsFI(0),
     RegScavengingFI(0), S0SpillReg(0),
     SinglePathConvert(false), SinglePathPseudoRoot(false), SPS0SpillOffset(0), SPExcessSpillOffset(0),
     SPCallSpillOffset(0)
     {}
+
+  MachineFunctionInfo *
+  clone(BumpPtrAllocator &Allocator, MachineFunction &DestMF,
+        const DenseMap<MachineBasicBlock *, MachineBasicBlock *> &Src2DstMBB)
+      const override {
+    return DestMF.cloneInfo<PatmosMachineFunctionInfo>(*this);
+  }
 
   /// getStackCacheReservedBytes - Get the number of bytes reserved on the
   /// stack cache.

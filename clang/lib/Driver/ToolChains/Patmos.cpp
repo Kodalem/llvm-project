@@ -7,43 +7,21 @@
 //===----------------------------------------------------------------------===//
 
 #include "Patmos.h"
-#include "CommonArgs.h"
 #include "Clang.h"
-#include "InputInfo.h"
-#include "clang/Driver/Compilation.h"
-#include "clang/Driver/Options.h"
-#include "llvm/Option/ArgList.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/raw_ostream.h"
-#include "clang/Basic/ObjCRuntime.h"
-#include "clang/Basic/Version.h"
+#include "clang/Basic/DiagnosticDriver.h"
 #include "clang/Driver/Action.h"
+#include "clang/Driver/CommonArgs.h"
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/Driver.h"
-#include "clang/Driver/DriverDiagnostic.h"
+#include "clang/Driver/InputInfo.h"
 #include "clang/Driver/Job.h"
-#include "clang/Driver/Options.h"
-#include "clang/Driver/SanitizerArgs.h"
 #include "clang/Driver/ToolChain.h"
-#include "clang/Driver/Util.h"
-#include "clang/Sema/SemaDiagnostic.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/Config/config.h"
-#include "llvm/Object/Archive.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
-#include "llvm/Option/Option.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Format.h"
-#include "llvm/Support/Host.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/Program.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -57,7 +35,7 @@ PatmosToolChain::PatmosToolChain(const Driver &D, const llvm::Triple &Triple,
                                const ArgList &Args)
     : ToolChain(D, Triple, Args) {
   // Get install path to find tools and libraries
-  std::string Path(D.getInstalledDir());
+  std::string Path(D.Dir);
   // tools?
   getProgramPaths().push_back(Path);
   if (llvm::sys::fs::exists(Path + "/bin/"))
@@ -265,7 +243,7 @@ void patmos::PatmosBaseTool::PrepareLink4Inputs(
 
 static std::string get_patmos_tool(const ToolChain &TC, StringRef ToolName)
 {
-  std::string InstallPath(TC.getDriver().getInstalledDir());
+  std::string InstallPath(TC.getDriver().Dir);
   if(TC.getDriver().Name.rfind("patmos-", 0) == 0) {
     // Driver is named "patmos-xxxx"
     // therefore, look for programs using that prefix

@@ -67,38 +67,41 @@ void PatmosAsmBackend::applyFixup(const MCFragment &Fragment, const MCFixup &Fix
                                   const MCValue &Target, uint8_t *Data,
                                   uint64_t Value, bool IsResolved) {
   MCFixupKind Kind = Fixup.getKind();
+
+  // Modern MC requires targets to explicitly emit relocations for unresolved
+  // fixups. Without this, symbol references silently encode as zero.
+  if (!IsResolved)
+    Asm->getWriter().recordRelocation(Fragment, Fixup, Target, Value);
+
+  if (mc::isRelocation(Kind))
+    return;
+
+  const MCFixupKindInfo Info = getFixupKindInfo(Kind);
   Value = adjustFixupValue(Fixup, Value);
 
   if (!Value)
     return; // Doesn't change encoding.
 
-    unsigned TargetSize = getFixupKindInfo(Kind).TargetSize;
-    unsigned TargetOffset = getFixupKindInfo(Kind).TargetOffset;
+  // Shift encoded bits into their final instruction position.
+  Value <<= Info.TargetOffset;
 
-    // Where do we start in the object
-    unsigned Offset = Fixup.getOffset();
-    // Number of bytes we need to fixup
-    unsigned NumBytes = (TargetSize + 7) / 8;
-    // Used to point to big endian bytes
-    unsigned FullSize = (TargetOffset + TargetSize + 7) / 8;
+  const unsigned NumBytes = alignTo(Info.TargetSize + Info.TargetOffset, 8) / 8;
+  const unsigned KindByteOffset =
+      (Kind == FK_Patmos_abs_ALUl) ? 4u : 0u;
 
-    // Grab current value, if any, from bits.
-    uint64_t CurVal = 0;
+  if (Fixup.getOffset() + KindByteOffset + NumBytes > Fragment.getSize()) {
+    getContext().reportError(Fixup.getLoc(), "invalid fixup offset");
+    return;
+  }
 
-    for (unsigned i = 0; i != NumBytes; ++i) {
-      unsigned Idx = (FullSize - 1 - i);
-      CurVal |= (uint64_t)((uint8_t)Data[Offset + Idx]) << (i*8);
-    }
+  Data += KindByteOffset;
 
-    uint64_t Mask = ((uint64_t)(-1) >> (64 - TargetSize));
-    unsigned Shift = FullSize * 8 - (TargetOffset + TargetSize);
-
-    CurVal |= (Value & Mask) << Shift;
-    // Write out the fixed up bytes back to the code/data bits.
-    for (unsigned i = 0; i != NumBytes; ++i) {
-      unsigned Idx = (FullSize - 1 - i);
-      Data[Offset + Idx] = (uint8_t)((CurVal >> (i*8)) & 0xff);
-    }
+  // Data points at fragment contents + Fixup.getOffset(). Patmos encodes bytes
+  // in big-endian order.
+  for (unsigned i = 0; i != NumBytes; ++i) {
+    const unsigned Idx = NumBytes - 1 - i;
+    Data[Idx] |= static_cast<uint8_t>((Value >> (i * 8)) & 0xff);
+  }
 }
 
 MCFixupKindInfo PatmosAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
@@ -108,17 +111,19 @@ MCFixupKindInfo PatmosAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
     //
     // name                    offset  bits  flags
     { "FK_Patmos_BO_7" ,       25,      7,   0 }, // 0 bit shifted, unsigned (byte aligned)
-    { "FK_Patmos_SO_7" ,       25,      7,   0 }, // 1 bit shifted, unsigned (half-word aligned)
+    { "FK_Patmos_HO_7" ,       25,      7,   0 }, // 1 bit shifted, unsigned (half-word aligned)
     { "FK_Patmos_WO_7" ,       25,      7,   0 }, // 2 bit shifted, unsigned (word aligned)
     { "FK_Patmos_abs_ALUi",    20,     12,   0 }, // ALU immediate, unsigned
     { "FK_Patmos_abs_CFLi",    10,     22,   0 }, // 2 bit shifted, unsigned, for call
-    { "FK_Patmos_abs_ALUl",    32,     32,   0 }, // ALU immediate, unsigned
+    { "FK_Patmos_abs_ALUl",     0,     32,   0 }, // ALUl immediate (reloc anchored at insn start)
     { "FK_Patmos_stc",         14,     18,   0 }, // 2 bit shifted, unsigned, for stack control
     // Modern LLVM tracks PC-relativity on the MCFixup itself (Fixup.isPCRel()),
     // so the Flags field in MCFixupKindInfo does not define FKF_IsPCRel anymore.
     // Use 0 here for the flags field... I hope...
     { "FK_Patmos_PCrel",       10,     22,   0 }, // 2 bit shifted, signed, PC relative
   };
+  static_assert(std::size(Infos) == Patmos::NumTargetFixupKinds,
+                "Fixup kind info table is out of sync with Patmos::Fixups");
 
   if (Kind < FirstTargetFixupKind)
     return MCAsmBackend::getFixupKindInfo(Kind);

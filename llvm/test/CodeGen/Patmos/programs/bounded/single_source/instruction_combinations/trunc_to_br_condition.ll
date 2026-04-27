@@ -12,11 +12,15 @@ define i32 @main(i32 %x) {
 entry:
   %t = trunc i32 %x to i1
   %tobool = icmp ne i1 %t, 0
-  br i1 %tobool, label %if.then, label %if.end
+  br i1 %tobool, label %if.then, label %if.else
 
 if.then:                                          ; preds = %entry
-  ret i32 1
+  br label %if.end
 
-if.end:                                           ; preds = %if.then, %entry
-  ret i32 0
+if.else:                                          ; preds = %entry
+  br label %if.end
+
+if.end:                                           ; preds = %if.else, %if.then
+  %res = phi i32 [ 1, %if.then ], [ 0, %if.else ]
+  ret i32 %res
 }

@@ -1,6 +1,6 @@
 ; RUN: llc < %s -mpatmos-subfunction-align=4 | FileCheck %s
 ; RUN: llc < %s -mpatmos-subfunction-align=4 -filetype=obj -o %t;\
-; RUN: ld.lld %t --nostdlib --static -o %t --section-start .text=1;\
+; RUN: ld.lld %t --nostdlib --static -o %t --section-start .text=1 --image-base=0;\
 ; RUN: llvm-objdump %t -d | FileCheck %s --check-prefix ALIGN
 ; RUN: LLC_ARGS="-mpatmos-subfunction-align=4"; %test_no_runtime_execution
 ; END.

@@ -622,19 +622,9 @@ PatmosTargetLowering::LowerCCCCallTo(CallLoweringInfo &CLI,
   if (InFlag.getNode())
     Ops.push_back(InFlag);
 
-  // attach machine-level aliasing information
-  int FI = DAG.getMachineFunction().getFrameInfo().CreateFixedObject(4, 0, true);
-  MachinePointerInfo MPO = MachinePointerInfo::getFixedStack(DAG.getMachineFunction(), FI);
-  MachineMemOperand *MMO = 
-      DAG.getMachineFunction().getMachineMemOperand(MPO,
-	                                            MachineMemOperand::MOLoad,
-					            4, Align(1));
-
-  Chain = DAG.getMemIntrinsicNode(PatmosISD::CALL, dl,
-                                  NodeTys, Ops,
-                                  MVT::i32, MMO);
-
-//   Chain = DAG.getNode(PatmosISD::CALL, dl, NodeTys, &Ops[0], Ops.size());
+  // Model calls as regular target nodes; modern SelectionDAG validates
+  // getMemIntrinsicNode opcodes and rejects non-memory target opcodes.
+  Chain = DAG.getNode(PatmosISD::CALL, dl, NodeTys, Ops);
   InFlag = Chain.getValue(1);
 
   // Create the CALLSEQ_END node.

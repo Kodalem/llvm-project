@@ -247,6 +247,10 @@ public:
   /// transforms following machine independent optimization.
   virtual void addIRPasses();
 
+  /// Add target-specific IR passes that must run before generic
+  /// pre-isel intrinsic lowering.
+  virtual void addPreISelIntrinsicLowering() {}
+
   /// Add passes to lower exception handling for the code generator.
   void addPassesToHandleExceptions();
 

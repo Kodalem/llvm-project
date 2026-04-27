@@ -222,8 +222,8 @@ static Attr *handleLoopboundAttr(Sema &S, Stmt *St, const ParsedAttr &A,
     return nullptr;
   }
   auto int_bits = (sizeof(int)*8);
-  if ( MinInt.getMinSignedBits() > int_bits ||
-       MaxInt.getMinSignedBits() > int_bits ) {
+  if ( MinInt.getNumSignBits() > int_bits ||
+       MaxInt.getNumSignBits() > int_bits ) {
     S.Diag(A.getLoc(), diag::err_pragma_loopbound_excessive_values);
     return nullptr;
   }

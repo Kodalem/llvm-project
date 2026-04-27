@@ -46,7 +46,9 @@ public:
     :  MCStreamer(Ctx), MII(MII), count(0), size(0), call(false) {}
 
   // Match the current MCStreamer API.
-  void changeSection(MCSection *Section, uint32_t Subsection) override {}
+  void changeSection(MCSection *Section, uint32_t Subsection) override {
+    MCStreamer::changeSection(Section, Subsection);
+  }
   void emitLabel(MCSymbol *Symbol, SMLoc Loc = SMLoc()) override {
     if (Symbol->isUndefined()) return;
     assert(getCurrentSection().first && "Cannot emit before setting section!");
@@ -290,6 +292,13 @@ public:
 
   std::unique_ptr<PatmosInstrAnalyzer> createPatmosInstrAnalyzer(MCContext &Ctx,
                                                  const MCInstrInfo &MII) const;
+
+  /// getInlineAsmLength - Estimate the length of an inline assembly fragment.
+  /// This is a Patmos-specific override to avoid generic overestimation that
+  /// breaks subfunction splitting tests.
+  unsigned getInlineAsmLength(const char *Str, const MCAsmInfo &MAI,
+                              const TargetSubtargetInfo *STI = nullptr)
+      const override;
 
   /// getInstrSize - get the size of an instruction.
   /// Correctly deals with inline assembler and bundles.

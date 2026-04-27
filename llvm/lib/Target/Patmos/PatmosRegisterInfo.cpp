@@ -41,10 +41,24 @@ PatmosRegisterInfo::PatmosRegisterInfo(const PatmosTargetMachine &tm,
                                        const TargetInstrInfo &tii)
   : PatmosGenRegisterInfo(Patmos::R1), TM(tm), TII(tii) {}
 
+
+// This needed to be implemented because otherwise it crashes.
 const uint32_t *PatmosRegisterInfo::getCallPreservedMask(const MachineFunction &MF,
                                      CallingConv::ID) const
 {
-  llvm_unreachable("Unimplemented");
+  // Build a bitmask of callee-saved registers.
+  // The mask has one bit per register, indexed by register number.
+  static uint32_t Mask[( Patmos::NUM_TARGET_REGS + 31) / 32] = {0};
+  static bool Initialized = false;
+  if (!Initialized) {
+    const MCPhysReg *CSRegs = getCalleeSavedRegs(&MF);
+    for (unsigned i = 0; CSRegs[i]; ++i) {
+      for (MCRegAliasIterator AI(CSRegs[i], this, true); AI.isValid(); ++AI)
+        Mask[*AI / 32] |= 1u << (*AI % 32);
+    }
+    Initialized = true;
+  }
+  return Mask;
 }
 
 const MCPhysReg*

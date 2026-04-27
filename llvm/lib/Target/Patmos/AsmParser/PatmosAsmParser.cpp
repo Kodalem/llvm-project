@@ -80,6 +80,8 @@ public:
                                SMLoc &EndLoc) override;
   bool parseRegister(OperandVector &Operands, bool EmitError);
 
+  bool tokenIsStartOfStatement(AsmToken::TokenKind Token) override;
+
   void EatToEndOfStatement();
 
 private:
@@ -99,8 +101,8 @@ private:
 
   /// ParseToken - Check if the Lexer is currently over the given token kind, and add it as operand if so.
   bool ParseToken(OperandVector &Operands, AsmToken::TokenKind Kind);
-  bool ParseInstruction(ParseInstructionInfo &Info, StringRef Name,
-                        SMLoc NameLoc, OperandVector &Operands);
+  bool ParseInstructionImpl(ParseInstructionInfo &Info, StringRef Name,
+                           SMLoc NameLoc, OperandVector &Operands);
 
   /// isPredSrcOperand - Check whether the operand might be a predicate source
   /// operand (i.e., has a negate flag)
@@ -493,6 +495,13 @@ ParseStatus PatmosAsmParser::tryParseRegister(MCRegister &RegNo, SMLoc &StartLoc
   return ParseStatus::Success;
 }
 
+bool PatmosAsmParser::tokenIsStartOfStatement(AsmToken::TokenKind Token) {
+  // Allow bundle markers ('{' and '}') to start statements so they can be
+  // handled as instruction names in parseInstruction. This is necessary because
+  // ParsePrefix was removed from MCTargetAsmParser in LLVM 13+.
+  return Token == AsmToken::LCurly || Token == AsmToken::RCurly;
+}
+
 bool PatmosAsmParser::
 parseRegister(OperandVector &Operands, bool EmitError) {
   AsmLexer &Lexer = getLexer();
@@ -519,7 +528,7 @@ parseRegister(OperandVector &Operands, bool EmitError) {
 bool PatmosAsmParser::
 parseRegister(MCRegister &RegNo, SMLoc &StartLoc, SMLoc &EndLoc) {
   StartLoc = getLexer().getLoc();
-  if (parseRegister(RegNo, StartLoc, EndLoc)) {
+  if (parseRegister(RegNo, /*Required=*/true)) {
     return true;
   }
 
@@ -583,11 +592,21 @@ ParseMemoryOperand(OperandVector &Operands)  {
     Operands.push_back(std::unique_ptr<PatmosOperand>(
         PatmosOperand::CreateReg(RegNo.id(), RegStart, RegEnd)));
 
-  } else {
+    // Accept bare [reg] and interpret it as [reg + 0].
+    if (Lexer.is(AsmToken::RBrac)) {
+      SMLoc E = Lexer.getLoc();
+      Operands.push_back(std::unique_ptr<MCParsedAsmOperand>(
+          PatmosOperand::CreateConstant(0, E, E, getParser().getContext())));
+      return ParseToken(Operands, AsmToken::RBrac);
+    }
 
+  } else {
+    // No base register: allow either [] (default 0) or [imm].
     if (Lexer.is(AsmToken::RBrac)) {
       // Default offset
       SMLoc E = Lexer.getLoc();
+      Operands.push_back(std::unique_ptr<MCParsedAsmOperand>(
+          PatmosOperand::CreateReg(Patmos::R0, E, E)));
       Operands.push_back(std::unique_ptr<MCParsedAsmOperand>(
           PatmosOperand::CreateConstant(0, E, E, getParser().getContext())));
 
@@ -596,8 +615,14 @@ ParseMemoryOperand(OperandVector &Operands)  {
     } else if (Lexer.is(AsmToken::Plus)) {
       // lex away the plus symbol, leave a minus, fail on everything else
       Lexer.Lex();
-    } else if (Lexer.isNot(AsmToken::Minus)) {
-      return Error(Lexer.getLoc(), "invalid separator between register and offset");
+    } else if (Lexer.is(AsmToken::Minus) || Lexer.is(AsmToken::Integer) ||
+               Lexer.is(AsmToken::Identifier) || Lexer.is(AsmToken::LParen)) {
+      SMLoc E = Lexer.getLoc();
+      Operands.push_back(std::unique_ptr<MCParsedAsmOperand>(
+          PatmosOperand::CreateReg(Patmos::R0, E, E)));
+      // ParseImmediate below handles numeric/symbolic offsets (with optional '-').
+    } else {
+      return Error(Lexer.getLoc(), "expected immediate offset or ']'");
     }
   }
 
@@ -672,7 +697,9 @@ ParseOperand(OperandVector &Operands, unsigned OpNo)  {
       return ParsePredicateOperand(Operands, true);
     }
 
-    return ParsePredicateOperand(Operands, false);
+    // For non-predicate-src operands (destinations, general registers),
+    // parse as a plain register without a negation flag.
+    return parseRegister(Operands, true);
   }
   if (Lexer.is(AsmToken::Identifier)) {
     // Parse it as a label
@@ -753,7 +780,13 @@ bool PatmosAsmParser::ParseToken(OperandVector &Operands,
 // ParsePrefix was removed from the base class. Its behavior (handling of
 // bundle markers / prefixes) is now inlined into ParseInstruction.
 
-bool PatmosAsmParser::ParseInstruction(ParseInstructionInfo &Info, StringRef Name, SMLoc NameLoc,
+bool PatmosAsmParser::parseInstruction(ParseInstructionInfo &Info, StringRef Name, SMLoc NameLoc,
+                 OperandVector &Operands)
+{
+  return ParseInstructionImpl(Info, Name, NameLoc, Operands);
+}
+
+bool PatmosAsmParser::ParseInstructionImpl(ParseInstructionInfo &Info, StringRef Name, SMLoc NameLoc,
                  OperandVector &Operands)
 {
   AsmLexer &Lexer = getLexer();

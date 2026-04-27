@@ -21,7 +21,7 @@
 #include "Arch/X86.h"
 #include "HIPAMD.h"
 #include "Hexagon.h"
-#include "MSP430.h"
+// #include "MSP430.h"  // Disabled for now
 #include "Solaris.h"
 #include "ToolChains/Cuda.h"
 #include "clang/Basic/CodeGenOptions.h"
@@ -905,7 +905,7 @@ void tools::getTargetFeatures(const Driver &D, const llvm::Triple &Triple,
     m68k::getM68kTargetFeatures(D, Triple, Args, Features);
     break;
   case llvm::Triple::msp430:
-    msp430::getMSP430TargetFeatures(D, Args, Features);
+    // MSP430 target features disabled for now
     break;
   case llvm::Triple::ve:
     ve::getVETargetFeatures(D, Args, Features);

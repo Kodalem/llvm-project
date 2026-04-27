@@ -1621,11 +1621,9 @@ void Parser::HandlePragmaLoopbound(Loopbound &LB) {
       static_cast<PragmaLoopboundInfo *>(Tok.getAnnotationValue());
   ConsumeAnnotationToken();
 
-  LB.PragmaNameLoc = IdentifierLoc::create(
-      Actions.Context,
-      Info->PragmaName.getLocation(),
-      Info->PragmaName.getIdentifierInfo()
-      );
+  LB.PragmaNameLoc = new (Actions.Context)
+      IdentifierLoc(Info->PragmaName.getLocation(),
+                    Info->PragmaName.getIdentifierInfo());
 
   assert(Info->Min.is(tok::numeric_constant));
   LB.MinExpr = Actions.ActOnNumericConstant(Info->Min).get();
@@ -3857,56 +3855,9 @@ void PragmaLoopboundHandler::HandlePragma(Preprocessor &PP,
                       /*IsReinject=*/false);
 
 }
-
-/// Handle the Microsoft \#pragma intrinsic extension.
-///
-/// The syntax is:
-/// \code
-///  #pragma intrinsic(memset)
-///  #pragma intrinsic(strlen, memcpy)
-/// \endcode
-///
-/// Pragma intrisic tells the compiler to use a builtin version of the
-/// function. Clang does it anyway, so the pragma doesn't really do anything.
-/// Anyway, we emit a warning if the function specified in \#pragma intrinsic
-/// isn't an intrinsic in clang and suggest to include intrin.h.
-void PragmaMSIntrinsicHandler::HandlePragma(Preprocessor &PP,
-                                            PragmaIntroducer Introducer,
-                                            Token &Tok) {
-  PP.Lex(Tok);
-
-  if (Tok.isNot(tok::l_paren)) {
-    PP.Diag(Tok.getLocation(), diag::warn_pragma_expected_lparen)
-        << "intrinsic";
-    return;
-  }
-  PP.Lex(Tok);
-
-  bool SuggestIntrinH = !PP.isMacroDefined("__INTRIN_H");
-
-  while (Tok.is(tok::identifier)) {
-    IdentifierInfo *II = Tok.getIdentifierInfo();
-    if (!II->getBuiltinID())
-      PP.Diag(Tok.getLocation(), diag::warn_pragma_intrinsic_builtin)
-          << II << SuggestIntrinH;
-
-    PP.Lex(Tok);
-    if (Tok.isNot(tok::comma))
-      break;
-    PP.Lex(Tok);
-  }
-
-  if (Tok.isNot(tok::r_paren)) {
-    PP.Diag(Tok.getLocation(), diag::warn_pragma_expected_rparen)
-        << "intrinsic";
-    return;
-  }
-  PP.Lex(Tok);
-
-  if (Tok.isNot(tok::eod))
-    PP.Diag(Tok.getLocation(), diag::warn_pragma_extra_tokens_at_eol)
-        << "intrinsic";
-}
+// Yeeted the Microsoft \#pragma intrinsic extension, because it breaks
+// compilation of the Parser being able to comprehendable to do the pargma #loopbound
+// Note: [C001] Document this shtuff and see what breaks
 
 bool Parser::HandlePragmaMSFunction(StringRef PragmaName,
                                     SourceLocation PragmaLocation) {

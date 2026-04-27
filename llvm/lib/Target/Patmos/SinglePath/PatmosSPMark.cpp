@@ -286,8 +286,18 @@ void PatmosSPMark::rewriteCall(MachineInstr *MI, bool pseudo_root_target) {
   MachineInstrBuilder MIB(*MBB->getParent(), MI);
   MIB.addGlobalAddress(SPTarget);
   if(!pseudo_root_target && PatmosSinglePathInfo::useNewSinglePathTransform()) {
-	// Add P7 as implicit to ensure LLVM knows it is used by the call
-	MIB.addUse(Patmos::P7, RegState::Implicit);
+  // Non-pseudo single-path calls use P7 as the function enable predicate.
+  // LLVM22 verifies physical register liveness more aggressively than LLVM12.
+  // A call-site-only live-in is insufficient in loop-heavy CFGs because P7 is
+  // treated like a global physical value that must be available on all paths
+  // reaching a use (e.g. deeply nested loop blocks before the call).
+  // Marking all caller blocks as P7 live-in keeps this contract explicit.
+  MIB.addUse(Patmos::P7, RegState::Implicit);
+  MachineFunction *CallerMF = MBB->getParent();
+  CallerMF->addLiveIn(Patmos::P7, &Patmos::PRegsRegClass);
+  for (MachineBasicBlock &BB : *CallerMF) {
+    BB.addLiveIn(Patmos::P7);
+  }
   }
   LLVM_DEBUG( dbgs() << "  Rewrite call: " << Target->getName()
                 << " -> " << SPFuncName << "\n" );

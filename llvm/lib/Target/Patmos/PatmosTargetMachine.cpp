@@ -18,6 +18,8 @@
 #include "PatmosStackCacheAnalysis.h"
 #include "TargetInfo/PatmosTargetInfo.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
@@ -28,6 +30,10 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/UnifyFunctionExitNodes.h"
 #include "llvm/Transforms/Utils.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/MemoryBuffer.h"
+
+#include "PatmosMachineFunctionInfo.h"
 
 using namespace llvm;
 
@@ -125,6 +131,19 @@ namespace {
       return false;
     }
 
+    void addPreISelIntrinsicLowering() override {
+      // LLVM22 lowers memset/memcpy very early in the generic pipeline.
+      // Ensure single-path attribution exists first, so intrinsic elimination
+      // can reliably diagnose variable-length mem intrinsics in SP functions.
+      if (PatmosSinglePathInfo::isEnabled()) {
+        addPass(createPatmosSPClonePass());
+      }
+
+      // Then run Patmos' intrinsic elimination before generic pre-isel
+      // intrinsic lowering, so we preserve Patmos loop-bound semantics.
+      addPass(createPatmosIntrinsicEliminationPass());
+    }
+
     //
     /// addPreISelPasses - This method should add any "last minute" LLVM->LLVM
     /// passes (which are run just before instruction selector).
@@ -135,11 +154,7 @@ namespace {
         // Single-path transformation currently cannot deal with
         // switch/jumptables -> lower them to ITEs
         addPass(createLowerSwitchPass());
-        addPass(createPatmosSPClonePass());
       }
-      // This pass must be after SPClone to ensure we know which functions are
-      // singlepath, so that we can report errors when needed
-      addPass(createPatmosIntrinsicEliminationPass());
 
       return PatmosSinglePathInfo::isEnabled();
     }
@@ -378,3 +393,19 @@ TargetPassConfig *PatmosTargetMachine::createPassConfig(PassManagerBase &PM) {
   return new PatmosPassConfig(*this, PM);
 }
 
+TargetTransformInfo
+PatmosTargetMachine::getTargetTransformInfo(const Function &F) const {
+  // Keep a conservative default until a Patmos-specific TTI implementation is added.
+  return TargetTransformInfo(F.getDataLayout());
+}
+
+MachineFunctionInfo *PatmosTargetMachine::createMachineFunctionInfo(
+    BumpPtrAllocator &Allocator, const Function &F,
+    const TargetSubtargetInfo *STI) const {
+  return PatmosMachineFunctionInfo::create<PatmosMachineFunctionInfo>(
+      Allocator, F, STI);
+}
+
+void PatmosTargetMachine::registerPassBuilderCallbacks(PassBuilder &PB) {
+  (void)PB;
+}

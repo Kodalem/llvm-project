@@ -810,8 +810,9 @@ void ScheduleDAGInstrs::buildSchedGraph(AAResults *AA,
 
   assert(Defs.empty() && Uses.empty() &&
          "Only BuildGraph should update Defs/Uses");
-  Defs.setUniverse(TRI->getNumRegs());
-  Uses.setUniverse(TRI->getNumRegs());
+  // This solves the failing of certain tests due to old behaviour not working as before
+  Defs.setUniverse(TRI->getNumRegUnits());
+  Uses.setUniverse(TRI->getNumRegUnits());
 
   assert(CurrentVRegDefs.empty() && "nobody else should use CurrentVRegDefs");
   assert(CurrentVRegUses.empty() && "nobody else should use CurrentVRegUses");

@@ -25,8 +25,11 @@
 #include "llvm/CodeGen/PseudoSourceValue.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/MC/MCSectionELF.h"
+#include "llvm/MC/MCAsmInfo.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/MC/TargetRegistry.h"
+#include <cctype>
+#include <cstdlib>
 
 using namespace llvm;
 
@@ -729,18 +732,99 @@ PatmosInstrInfo::createPatmosInstrAnalyzer(MCContext &Ctx,
   return PIA;
 }
 
+unsigned PatmosInstrInfo::getInlineAsmLength(const char *Str,
+                                             const MCAsmInfo &MAI,
+                                             const TargetSubtargetInfo * /*STI*/) const {
+  if (!Str || !*Str)
+    return 0;
+
+  unsigned Length = 0;
+  StringRef S(Str);
+
+  while (!S.empty()) {
+    StringRef Line;
+    std::tie(Line, S) = S.split('\n');
+    Line = Line.trim();
+
+    if (Line.empty())
+      continue;
+
+    // Drop end-of-line comments before classifying the statement.
+    StringRef Comment = MAI.getCommentString();
+    if (!Comment.empty()) {
+      size_t CommentPos = Line.find(Comment);
+      if (CommentPos != StringRef::npos)
+        Line = Line.take_front(CommentPos).trim();
+    }
+
+    if (Line.empty())
+      continue;
+
+    // Ignore local labels and non-size-emitting directives in the estimator.
+    if (Line.ends_with(":"))
+      continue;
+
+    if (Line.starts_with(".space")) {
+      // Keep support for explicit byte padding in inline asm.
+      StringRef Args = Line.drop_front(6).trim();
+      StringRef FirstArg = Args.split(',').first.trim();
+      int64_t Bytes = 0;
+      if (!FirstArg.empty() && !FirstArg.getAsInteger(10, Bytes) && Bytes > 0)
+        Length += static_cast<unsigned>(Bytes);
+      continue;
+    }
+
+    if (Line.starts_with('.'))
+      continue;
+
+    // Heuristic: Patmos inline asm instructions are usually 4 bytes, but
+    // immediates outside short range require long encodings (8 bytes).
+    unsigned InstLen = 4;
+    for (size_t I = 0; I < Line.size();) {
+      if (!(Line[I] == '-' || std::isdigit(static_cast<unsigned char>(Line[I])))) {
+        ++I;
+        continue;
+      }
+
+      size_t Start = I;
+      if (Line[I] == '-')
+        ++I;
+
+      size_t DigitsStart = I;
+      while (I < Line.size() && std::isdigit(static_cast<unsigned char>(Line[I])))
+        ++I;
+
+      if (DigitsStart == I)
+        continue;
+
+      int64_t Val = 0;
+      StringRef NumTok = Line.slice(Start, I);
+      if (!NumTok.getAsInteger(10, Val) && (Val < -2048 || Val > 2047)) {
+        InstLen = 8;
+        break;
+      }
+    }
+
+    Length += InstLen;
+  }
+
+  return Length;
+}
+
 unsigned int PatmosInstrInfo::getInstrSize(const MachineInstr *MI) const {
   if (MI->isInlineAsm()) {
-    PatmosAsmPrinter PAP(const_cast<PatmosTargetMachine&>(PTM),
-        createPatmosInstrAnalyzer(MI->getMF()->getContext(), *PTM.getInstrInfo()));
+    // Use the generic target hook for inline-asm length estimation instead of
+    // spinning up a partial AsmPrinter+MC parser context.
+    unsigned NumDefs = 0;
+    for (; MI->getOperand(NumDefs).isReg() && MI->getOperand(NumDefs).isDef();
+         ++NumDefs)
+      assert(NumDefs != MI->getNumOperands() - 2 && "No asm string?");
 
-    // This call will parse the inline asm and emit each instruction through PatmosInstrAnalyzer.
-    // PatmosInstrAnalyzer doesn't actually emit the instructions, instead it just sums their sizes.
-    PAP.mockEmitInlineAsmForSizeCount(MI);
+    assert(MI->getOperand(NumDefs).isSymbol() && "No asm string?");
+    const char *AsmStr = MI->getOperand(NumDefs).getSymbolName();
 
-    // we then get back the PatmosInstrAnalyzer which now has summed
-    // the size of the instructions in the inline asm.
-    return ((PatmosInstrAnalyzer*)PAP.OutStreamer.get())->getSize();
+    const TargetSubtargetInfo *STI = &MI->getMF()->getSubtarget();
+    return getInlineAsmLength(AsmStr, *PTM.getMCAsmInfo(), STI);
   }
   else if (MI->isBundle()) {
     // Bundles can only be made up of 2 4-byte instructions
