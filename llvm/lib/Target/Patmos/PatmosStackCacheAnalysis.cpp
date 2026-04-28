@@ -36,6 +36,7 @@
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -1668,11 +1669,13 @@ namespace llvm {
       // a temporary path object within a local scope, appends the filename using
       // the /= operator, and reassigns the resulting path back to the original
       // string variable.
-      {
-        std::filesystem::path p(LPname.c_str());
-        p /= "scc.lp";
-        LPname = p.c_str();
-      }
+      //{
+      //  std::filesystem::path p(LPname.c_str());
+      //  p /= "scc.lp";
+      //  LPname = p.c_str();
+      //}
+
+      sys::path::append(LPname, "scc.lp");
 
       std::error_code ErrMsg;
       raw_fd_ostream OS(LPname.c_str(), ErrMsg);
@@ -2389,11 +2392,14 @@ namespace llvm {
         return std::numeric_limits<unsigned int>::max();
       }
 
-      {
-        std::filesystem::path p(LPname.c_str());
-        p /= "scc.lp";
-        LPname = p.c_str();
-      }
+
+      // {
+      //  std::filesystem::path p(LPname.c_str());
+      //  p /= "scc.lp";
+      //  LPname = p.c_str();
+      // }
+
+      sys::path::append(LPname, "scc.lp");
 
       std::error_code ErrCode;
       raw_fd_ostream OS(LPname.c_str(), ErrCode);
