@@ -2,7 +2,9 @@
 #include "gmock/gmock.h"
 #include "SinglePath/SPListScheduler.h"
 #include "llvm/ADT/SmallVector.h"
+#include <optional>
 #include <set>
+#include <tuple>
 
 using namespace llvm;
 
