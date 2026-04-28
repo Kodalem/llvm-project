@@ -25,8 +25,8 @@ inputs:
   enable-tests:
     description: 'Wether to run any tests'
     required: true
-    default: true
-    
+    default: 'true'
+
 runs:
   using: "composite"
   steps: 
