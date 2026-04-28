@@ -8,6 +8,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "InputFiles.h"
+#include "InputSection.h"
+#include "OutputSections.h"
 #include "Symbols.h"
 #include "SyntheticSections.h"
 #include "Target.h"
@@ -30,6 +32,7 @@ public:
   int64_t getImplicitAddend(const uint8_t *buf, RelType type) const override;
   void relocate(uint8_t *loc, const Relocation &rel,
                 uint64_t val) const override;
+  void relocateAlloc(InputSection &sec, uint8_t *buf) const override;
 };
 
 }
@@ -181,16 +184,10 @@ void Patmos::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   }
   case R_PATMOS_ABS_32: {
     // Relocate 32 bit word, absolute (unsigned), in bytes
-    checkUInt(ctx, loc, static_cast<int64_t>(val), 32, rel);
-
-    uint64_t out =  read32be(loc);
-    uint32_t temp =  extractBits(val, 31, 0);
-    out += temp;
-
-    checkIntUInt(ctx, loc, out, 32, rel);
-
-    write32be(loc,out);
-    
+    // val is S+A without sign-extension (see relocateAlloc override).
+    // Accept both signed and unsigned 32-bit range.
+    checkIntUInt(ctx, loc, static_cast<int64_t>(val), 32, rel);
+    write32be(loc, static_cast<uint32_t>(val));
     return;
   }
   case R_PATMOS_CFLI_PCREL: {
@@ -210,3 +207,20 @@ void Patmos::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
 }
 
 void elf::setPatmosTargetInfo(Ctx &ctx) { ctx.target.reset(new Patmos(ctx)); }
+
+// Override relocateAlloc to avoid LLD's default SignExtend64<32> step.
+// For Patmos (32-bit), sign-extending the S+A value before range-checking
+// turns an out-of-range 0x100000000 into 0, hiding the overflow.
+// By skipping sign-extension we preserve the original computed value and
+// let the per-relocation check functions detect overflow correctly.
+void Patmos::relocateAlloc(InputSection &sec, uint8_t *buf) const {
+  const uint64_t secAddr = sec.getOutputSection()->addr + sec.outSecOff;
+  for (const Relocation &rel : sec.relocs()) {
+    uint8_t *const loc = buf + rel.offset;
+    const uint64_t val =
+        sec.getRelocTargetVA(ctx, rel, secAddr + rel.offset);
+    if (rel.expr != R_RELAX_HINT)
+      relocate(loc, rel, val);
+  }
+}
+

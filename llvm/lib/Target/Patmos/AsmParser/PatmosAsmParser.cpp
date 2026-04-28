@@ -600,6 +600,13 @@ ParseMemoryOperand(OperandVector &Operands)  {
       return ParseToken(Operands, AsmToken::RBrac);
     }
 
+    // Consume an optional '+' separator between the base register and the
+    // offset expression (e.g. [$r2 + foo]). Without consuming it first,
+    // parseExpression would see '+foo' and produce a MCUnary expression
+    // that PatmosMCCodeEmitter cannot handle.
+    if (Lexer.is(AsmToken::Plus))
+      Lexer.Lex();
+
   } else {
     // No base register: allow either [] (default 0) or [imm].
     if (Lexer.is(AsmToken::RBrac)) {
