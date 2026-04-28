@@ -256,6 +256,15 @@ def gspat : PatLeaf<(i32 globaladdr), [{}], GS_XForm>;
 def ES_XForm : SDNodeXForm<externalsym, [{ return CurDAG->getTargetExternalSymbol(N->getSymbol(), N->getValueType(0), N->getTargetFlags()); }]>;
 def espat : PatLeaf<(i32 externalsym), [{}], ES_XForm>;
 
+// Add `CP_XForm` and `cppat` to lower `constpool` to `TargetConstantPool`.
+def CP_XForm : SDNodeXForm<constpool, [{
+  auto CP = cast<ConstantPoolSDNode>(N);
+  return CurDAG->getTargetConstantPool(CP->getConstVal(), N->getValueType(0),
+                                       CP->getAlign(), CP->getOffset(),
+                                       CP->getTargetFlags());
+}]>;
+def cppat : PatLeaf<(i32 constpool), [{}], CP_XForm>;
+
 // Helper fragment for condition inversion
 def notcc  : PatFrag<(ops node:$in), (i1 (setne node:$in, (i1 -1)))>;
 

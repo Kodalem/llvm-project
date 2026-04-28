@@ -204,15 +204,23 @@ def : Pat<(i32 jtpat:$dst), (LIl jtpat:$dst)>;
 // global addresses, external symbols, and frame indices
 def : Pat<(gspat:$sym), (LIl gspat:$sym)>;
 def : Pat<(espat:$sym), (LIl espat:$sym)>;
+// copied from RISC-V - needs proper verification
+def : Pat<(cppat:$sym), (LIl cppat:$sym)>;
 
 def : Pat<(add gspat:$sym, RRegs:$r), (ADDl RRegs:$r, gspat:$sym)>;
 def : Pat<(add espat:$sym, RRegs:$r), (ADDl RRegs:$r, espat:$sym)>;
+// copied from RISC-V - needs proper verification
+def : Pat<(add cppat:$sym, RRegs:$r), (ADDl RRegs:$r, cppat:$sym)>;
 
 def : Pat<(add gspat:$sym, (shl RRegs:$r, (i32 1))), (SHADDl RRegs:$r, gspat:$sym)>;
 def : Pat<(add espat:$sym, (shl RRegs:$r, (i32 1))), (SHADDl RRegs:$r, espat:$sym)>;
+// copied from RISC-V - needs proper verification
+def : Pat<(add cppat:$sym, (shl RRegs:$r, (i32 1))), (SHADDl RRegs:$r, cppat:$sym)>;
 
 def : Pat<(add gspat:$sym, (shl RRegs:$r, (i32 2))), (SHADD2l RRegs:$r, gspat:$sym)>;
 def : Pat<(add espat:$sym, (shl RRegs:$r, (i32 2))), (SHADD2l RRegs:$r, espat:$sym)>;
+// copied from RISC-V - needs proper verification
+def : Pat<(add cppat:$sym, (shl RRegs:$r, (i32 2))), (SHADD2l RRegs:$r, cppat:$sym)>;
 
 def : Pat<(fipat:$fi) , (ADDi fipat:$fi, 0)>;
 def : Pat<(add fipat:$fi, imm7:$imm) , (ADDi fipat:$fi, imm7:$imm)>;
