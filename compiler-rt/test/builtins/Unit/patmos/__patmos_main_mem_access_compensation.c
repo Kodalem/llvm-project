@@ -161,6 +161,9 @@ extern void __patmos_main_mem_access_compensation();
 // IN3XX: Operations: 20
 // IN4XX: Operations: 29
 // IN5XX: Operations: 29
+// IN15XX: Operations: 47
+// IN16XX: Operations: 56
+// IN17XX: Operations: 56
 // CHECK-LABEL: Instruction Cache Statistics:
 // CHECK-LABEL: Data Cache Statistics:
 // CHECK-LABEL: Stack Cache Statistics:
