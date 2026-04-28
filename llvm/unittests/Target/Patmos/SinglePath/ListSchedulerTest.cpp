@@ -125,15 +125,15 @@ namespace llvm{
     std::set<Operand> writes;
 
     /// The operand this instruction uses as a predicate.
-    Optional<Operand> predicate;
+    std::optional<Operand> predicate;
 
     /// Equivalence class of this instruction.
-    Optional<unsigned> eq_class_nr;
+    std::optional<unsigned> eq_class_nr;
 
     InstrAttr attr;
 
     MockInstr(std::set<Operand> reads, std::set<Operand> writes, InstrAttr attr):
-      reads(reads), writes(writes), attr(attr), eq_class_nr(None)
+      reads(reads), writes(writes), attr(attr), eq_class_nr(std::nullopt)
     {}
 
     MockInstr(std::set<Operand> reads, std::set<Operand> writes, unsigned eq_class_nr, InstrAttr attr):
@@ -181,7 +181,7 @@ namespace llvm{
     return instr->writes;
   }
 
-  Optional<Operand> uses_predicate(const MockInstr* instr) {
+  std::optional<Operand> uses_predicate(const MockInstr* instr) {
     return instr->predicate;
   }
 
@@ -225,27 +225,6 @@ namespace llvm{
 	  }
   }
 
-  llvm::Optional<std::tuple<
-      void*,
-      bool (*)(void*, const MockInstr *),
-      bool (*)(const MockInstr *),
-      bool (*)(const MockInstr *, const MockInstr *)
-    >> disable_dual_issue = None;
-  llvm::Optional<std::tuple<
-      void*,
-      bool (*)(void*, const MockInstr *),
-      bool (*)(const MockInstr *),
-      bool (*)(const MockInstr *, const MockInstr *)
-    >> enable_dual_issue = std::make_tuple((void*)nullptr, may_second_slot, is_long, may_bundle);
-
-  /// Returns whether the two instructions are dependent based only on their eq_class_nr
-  /// If classes are missing or the same they are dependent.
-  /// If classes are different numbers they are independent.
-  auto default_dependencies = [](auto instr1, auto instr2){
-    std::set<std::pair<unsigned, unsigned>> class_deps;
-    return dependent_eq_classes(instr1, instr2, class_deps);
-  };
-
   class MockMBB {
   public:
     // We use pointers to vectors because using vectors directly always
@@ -267,6 +246,42 @@ namespace llvm{
 
   };
 }
+
+using llvm::MockInstr;
+using llvm::Operand;
+using llvm::InstrAttr;
+using llvm::reads;
+using llvm::writes;
+using llvm::uses_predicate;
+using llvm::poisons;
+using llvm::memory_access;
+using llvm::latency;
+using llvm::conditional_branch;
+using llvm::may_second_slot;
+using llvm::is_long;
+using llvm::may_bundle;
+using llvm::dependent_eq_classes;
+
+std::optional<std::tuple<
+    void*,
+    bool (*)(void*, const MockInstr *),
+    bool (*)(const MockInstr *),
+    bool (*)(const MockInstr *, const MockInstr *)
+  >> disable_dual_issue = std::nullopt;
+std::optional<std::tuple<
+    void*,
+    bool (*)(void*, const MockInstr *),
+    bool (*)(const MockInstr *),
+    bool (*)(const MockInstr *, const MockInstr *)
+  >> enable_dual_issue = std::make_tuple((void*)nullptr, may_second_slot, is_long, may_bundle);
+
+/// Returns whether the two instructions are dependent based only on their eq_class_nr
+/// If classes are missing or the same they are dependent.
+/// If classes are different numbers they are independent.
+auto default_dependencies = [](auto instr1, auto instr2){
+  std::set<std::pair<unsigned, unsigned>> class_deps;
+  return llvm::dependent_eq_classes(instr1, instr2, class_deps);
+};
 
 namespace {
 
