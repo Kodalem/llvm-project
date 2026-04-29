@@ -117,7 +117,7 @@ runs:
       if: inputs.enable-tests == 'true'
       uses: ./.github/actions/build-test
       with:
-        targets: apinotes-test c-index-test clang-diff clang-format clang-scan-deps clang-import-test clang-rename diagtool hmaptool clang-refactor
+        targets: apinotes-test c-index-test clang-diff clang-format clang-scan-deps clang-import-test diagtool hmaptool clang-refactor
         path: ${{env.CLANG_PATH}}/test 
         working-dir: ${{env.BUILD_PATH}}
         include: ${{inputs.include-only}}
