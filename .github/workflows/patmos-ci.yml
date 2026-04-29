@@ -72,7 +72,7 @@ jobs:
           - platform: macos-14 # ARM
             cc: clang
             cxx: clang++
-          - platform: macos-13 # x86
+          - platform: namespace-profile-llvm
             cc: clang
             cxx: clang++
           
@@ -108,7 +108,7 @@ jobs:
           - platform: macos-14 # ARM
             cc: clang
             cxx: clang++
-          - platform: macos-13 # x86
+          - platform: namespace-profile-llvm
             cc: clang
             cxx: clang++
     needs: [package-patmos]     

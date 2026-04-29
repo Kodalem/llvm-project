@@ -152,10 +152,14 @@ runs:
       shell: bash
       env:
         TARGETS: ${{ inputs.targets }}
+      # https://endoflife.date/github-actions-runner-images#:~:text=Table_title:%20GitHub%20Actions%20Runner%20Images%20Table_content:%20header:,1%20year%20ago%20(15%20Apr%202025)%20%7C
+      # This shite will be yeeted soon by 2nd of November! Prepare to remove it fr fr.
       run: |
         cmake $GITHUB_WORKSPACE/$COMPILER_RT_PATH \
           -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/$COMPILER_RT_PATH/cmake/patmos-clang-toolchain.cmake" \
           -DCMAKE_PROGRAM_PATH="$GITHUB_WORKSPACE/$BUILD_PATH/bin" \
+          -DLLVM_TOOLS_DIR="$GITHUB_WORKSPACE/$BUILD_PATH/bin" \
+          -DLLVM_CONFIG_PATH="$GITHUB_WORKSPACE/$BUILD_PATH/bin/llvm-config" \
           -DCOMPILER_RT_INCLUDE_TESTS=ON
     - name: Compiler-RT Unit Tests
       uses: ./.github/actions/build-test
