@@ -79,11 +79,11 @@ make -j
 
 If you need to build the standard library (newlib):
 
-```
+```zsh
 git clone https://github.com/t-crest/patmos-newlib
 mkdir build-newlib
 cd build-newlib
-../patmos-newlib/configure --target=patmos-unknown-unknown-elf AR_FOR_TARGET=ar CC_FOR_TARGET="$(pwd)/../build/bin/clang" CFLAGS_FOR_TARGET="-target patmos-unknown-unknown-elf -O2 -emit-llvm -D__GLIBC_USE\(...\)=0" RANLIB_FOR_TARGET=ranlib LD_FOR_TARGET="$(pwd)/../build/bin/clang"
+../patmos-newlib/configure --target=patmos-unknown-unknown-elf AR_FOR_TARGET=ar CC_FOR_TARGET="$(pwd)/../build/bin/clang" CFLAGS_FOR_TARGET="-target patmos-unknown-unknown-elf -O2 -emit-llvm -D__GLIBC_USE\(...\)=0 -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types" RANLIB_FOR_TARGET=ranlib LD_FOR_TARGET="$(pwd)/../build/bin/clang" 
 make
 ```
 This compiles std into bitcode files, such that they are ready to publish with the compiler.
@@ -253,7 +253,7 @@ cp build/lib/Target/Patmos/PatmosGenAsmMatcher.inc llvm/lib/Target/Patmos/
 
 What the hecc to do next...
 
-```
+```zsh
 
 # 0) Find first real blocker
 ./build/bin/llvm-lit llvm/test/CodeGen/Patmos/ -j1 -sv --max-failures=1
@@ -273,7 +273,7 @@ cmake --build build --target llc -j16
 ```
 
 How to compile the stuff later:
-```
+```zsh
 
 # 0) This is how to compile the code
 ./build/bin/clang++ --target=patmos-unknown-unknown-elf -O0 -c ./fibonacci-test.cpp -o ./fibonacci-test.o
