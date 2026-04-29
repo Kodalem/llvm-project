@@ -1115,8 +1115,17 @@ void CodeGenFunction::EmitLoopBounds(
     }
     auto *call_inst = llvm::CallInst::Create(FT, loop_bound_fn, {MinVal, MaxVal});
 
-    // Emit before terminator
-    call_inst->insertBefore(BB->getTerminator()->getIterator());
+    // Emit before terminator.
+    // NOTE: [001A] Ask Emad if this assumption is correct.
+    // NOTE: For do-while loops, LoopBody has no terminator yet at the point
+    // where EmitLoopBounds is called (the back-edge branch to do.cond is only
+    // added later by EmitBlock). Guard against a null terminator so we don't
+    // dereference a null pointer inside LLVM's ilist (LLVM 22).
+    if (auto *Term = BB->getTerminator()) {
+      call_inst->insertBefore(Term->getIterator());
+    } else {
+      call_inst->insertInto(BB, BB->end());
+    }
   }
 }
 

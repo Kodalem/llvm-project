@@ -276,7 +276,7 @@ How to compile the stuff later:
 ```zsh
 
 # 0) This is how to compile the code
-./build/bin/clang++ --target=patmos-unknown-unknown-elf -O0 -c ./fibonacci-test.cpp -o ./fibonacci-test.o
+./build/bin/clang++ --target=patmos-unknown-unknown-elf -O2 -c ./fibonacci-test.cpp -o ./fibonacci-test.o
 
 # 1) This is how to object dump the code
 ./build/bin/llvm-objdump -d ./fibonacci-test.o 

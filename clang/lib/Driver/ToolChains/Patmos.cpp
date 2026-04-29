@@ -337,16 +337,25 @@ bool patmos::PatmosBaseTool::ConstructOptJob(const Tool &Creator,
   //----------------------------------------------------------------------------
   // append optimization options
 
-  // pass -O level to opt verbatim
-  OptArg->renderAsInput(Args, OptArgs);
-
-  // for some reason, we need to add this manually
-  OptArgs.push_back("--internalize");
-  OptArgs.push_back("--globaldce");
-
-  if (OptLevel == 3) {
-    OptArgs.push_back("--std-link-opts");
+  // Build a single -passes= string for the new pass manager.
+  // The legacy --internalize and --globaldce flags are no longer accepted;
+  // they must be embedded in the passes pipeline string.
+  std::string DefaultPipeline;
+  if (Lvl == 's') {
+    DefaultPipeline = "default<Os>";
+  } else if (Lvl == 'z') {
+    DefaultPipeline = "default<Oz>";
+  } else {
+    DefaultPipeline = std::string("default<O") + Lvl + ">";
   }
+  // Internalize globals then remove dead ones; equivalent to legacy
+  // --internalize --globaldce pair. For O3, also run globalopt+deadargelim
+  // (approximate replacement for the removed --std-link-opts).
+  std::string PassesPipeline = DefaultPipeline + ",internalize,globaldce";
+  if (OptLevel == 3) {
+    PassesPipeline += ",globalopt,deadargelim";
+  }
+  OptArgs.push_back(Args.MakeArgString("-passes=" + PassesPipeline));
 
   //----------------------------------------------------------------------------
   // append output and input files
@@ -585,21 +594,27 @@ void patmos::Compile::ConstructJob(Compilation &C, const JobAction &JA,
       // Compile to machine code
       matchesJob(JA, types::TY_Object, Action::AssembleJobClass)
   ){
-    // Make job to compile to BC
-    BackendJobAction prelink_job((Action*) &JA, types::TY_LLVM_BC);
+    // Make job to compile to BC.
+    // NOTE: MakeAction stores the action in the Compilation's AllActions list so
+    // it outlives ConstructJob. A stack-local BackendJobAction would be destroyed
+    // on return, leaving the Command with a dangling const Action & reference
+    // that crashes Driver::ExecuteCompilation in LLVM 22 (cast<JobAction> on a
+    // stale pointer when processing FailingCommands).
+    BackendJobAction *prelink_job =
+        C.MakeAction<BackendJobAction>((Action*) &JA, types::TY_LLVM_BC);
 
     if( C.getActions().size() > 0 &&
         matchesJob(**C.getActions().begin(), types::TY_Image, Action::LinkJobClass)
     ){
       // The ultimate job is to produce an executable, therefore, produce only bitcode
       // which is compiled into machine code in FinalLink
-      Clang::ConstructJob(C, prelink_job, Output, Inputs, Args, LinkingOutput);
+      Clang::ConstructJob(C, *prelink_job, Output, Inputs, Args, LinkingOutput);
     } else {
       // We just need an object file
       const char *BCFilename = CreateOutputFilename(C, Output, "clang-", "bc", false);
 
       const InputInfo TmpOutput(types::TY_LLVM_BC, BCFilename, Inputs[0].getFilename());
-      Clang::ConstructJob(C, prelink_job, TmpOutput, Inputs, Args, LinkingOutput);
+      Clang::ConstructJob(C, *prelink_job, TmpOutput, Inputs, Args, LinkingOutput);
 
       ////////////////////////////////////////////////////////////////////////////
       // build LLC command

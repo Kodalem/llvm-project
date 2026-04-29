@@ -1,4 +1,4 @@
-// RUN: export PATMOS_GOLD=%T/../mock-binaries/mock-patmos-ld; \
+// RUN: export PATMOS_GOLD=%patmos_mock_binaries/mock-patmos-ld; \
 // RUN: %clang --target=patmos %s -o %t -v
 // END.
 ///////////////////////////////////////////////////////////////////////////////////////////////////

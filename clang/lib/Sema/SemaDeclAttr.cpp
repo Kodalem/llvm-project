@@ -7253,6 +7253,10 @@ ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D, const ParsedAttr &AL,
     S.Diag(AL.getLoc(), diag::err_attribute_invalid_on_decl)
         << AL << AL.isRegularKeywordAttribute() << D->getLocation();
     break;
+  // Patmos-specific attributes.
+  case ParsedAttr::AT_SinglePath:
+    handleSinglePathAttr(S, D, AL);
+    break;
   case ParsedAttr::AT_Interrupt:
     handleInterruptAttr(S, D, AL);
     break;
