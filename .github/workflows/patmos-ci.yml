@@ -89,6 +89,8 @@ jobs:
 
 
   package-patmos-cmake:
+    # Note: The Cmake action config already invokes the test action within, so
+    # don't be alarmed if "build-test-cmake" is "missing" here.
     name: Build, Test, and Package with CMake + Ninja (${{matrix.platform}})
     runs-on: ${{matrix.platform}}
     strategy:
@@ -98,23 +100,25 @@ jobs:
           - platform: ubuntu-latest
             cc: gcc
             cxx: g++
-            parallelism: '3'
+            parallelism: '4'
           - platform: ubuntu-22.04
             cc: gcc
             cxx: g++
-            parallelism: '3'
+            parallelism: '4'
           - platform: macos-latest # ARM
             cc: clang
             cxx: clang++
-            parallelism: '3'
+            parallelism: '4'
           - platform: macos-14 # ARM
             cc: clang
             cxx: clang++
-            parallelism: '3'
+            parallelism: '4'
           - platform: namespace-profile-llvm
             cc: clang
             cxx: clang++
-            parallelism: '4'
+            # Tweak it as required, it should be high enough to speed up, but not too high
+            # to crash due to out of memory issues.
+            parallelism: '6'
 
     env:
       CC: ${{matrix.cc}}
@@ -187,9 +191,11 @@ jobs:
           - platform: macos-14 # ARM
             cc: clang
             cxx: clang++
-          - platform: namespace-profile-llvm
-            cc: clang
-            cxx: clang++
+          # TODO: Re-enable Namespace CI once the LLVM build is stable enough.
+          # For now it is just wasting resources and making it harder to identify issues in the CI.
+          #- platform: namespace-profile-llvm
+          #  cc: clang
+          #  cxx: clang++
           
     env:
       CC: ${{matrix.cc}}
