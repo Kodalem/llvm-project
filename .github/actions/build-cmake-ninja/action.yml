@@ -171,28 +171,7 @@ runs:
         exclude: LLVM-Unit
         parallelism: ${{ inputs.parallelism }}
 
-    - name: Run Clang Unit Tests
-      if: inputs.enable-tests == 'true'
-      uses: ./.github/actions/build-test-cmake
-      with:
-        targets: ''
-        path: ${{env.CLANG_PATH}}/test
-        working-dir: ${{env.BUILD_PATH}}
-        include: Clang-Unit.*(${{inputs.include-only}})
-        exclude: ${{inputs.exclude-reg}}
-        lit-args: --allow-empty-runs
-        parallelism: ${{ inputs.parallelism }}
 
-    - name: Run Clang Regression Tests
-      if: inputs.enable-tests == 'true'
-      uses: ./.github/actions/build-test-cmake
-      with:
-        targets: ''
-        path: ${{env.CLANG_PATH}}/test
-        working-dir: ${{env.BUILD_PATH}}
-        include: ${{inputs.include-only}}
-        exclude: Clang-Unit
-        parallelism: ${{ inputs.parallelism }}
 
     - name: Configure Compiler-RT Build (Non-Patmos)
       if: ${{ !startsWith(inputs.default-target, 'patmos') }}
@@ -274,6 +253,29 @@ runs:
       run: |
         $GITHUB_WORKSPACE/$NEWLIB_PATH/configure --target=patmos-unknown-unknown-elf AR_FOR_TARGET=ar CC_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/clang" CFLAGS_FOR_TARGET="-target patmos-unknown-unknown-elf -O2 -emit-llvm -D__GLIBC_USE\(...\)=0 -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types" RANLIB_FOR_TARGET=ranlib LD_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/clang"
         make
+
+    - name: Run Clang Unit Tests
+      if: inputs.enable-tests == 'true'
+      uses: ./.github/actions/build-test-cmake
+      with:
+        targets: ''
+        path: ${{env.CLANG_PATH}}/test
+        working-dir: ${{env.BUILD_PATH}}
+        include: ${{inputs.include-only}}
+        exclude: ${{inputs.exclude-reg}}
+        lit-args: --allow-empty-runs
+        parallelism: ${{ inputs.parallelism }}
+
+    - name: Run Clang Regression Tests
+      if: inputs.enable-tests == 'true'
+      uses: ./.github/actions/build-test-cmake
+      with:
+        targets: ''
+        path: ${{env.CLANG_PATH}}/test
+        working-dir: ${{env.BUILD_PATH}}
+        include: ${{inputs.include-only}}
+        exclude: Clang-Unit
+        parallelism: ${{ inputs.parallelism }}
 
     - name: Build Package with Ninja
       working-directory: ${{env.BUILD_PATH}}
