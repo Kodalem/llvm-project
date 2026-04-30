@@ -92,7 +92,7 @@ runs:
         targets: UnitTests lli llvm-install-name-tool dsymutil lli-child-target llvm-cov llvm-cxxdump llvm-diff llvm-exegesis llvm-extract llvm-isel-fuzzer llvm-ifs llvm-jitlink llvm-opt-fuzzer llvm-link llvm-lto llvm-lto2 llvm-mca llvm-modextract llvm-profdata llvm-ranlib llvm-rc llvm-rtdyld llvm-size llvm-split llvm-strings llvm-undname llvm-c-test llvm-cxxfilt llvm-xray yaml-bench verify-uselistorder bugpoint sancov sanstats llvm-addr2line
         path: ${{env.LLVM_PATH}}/test
         working-dir: ${{env.BUILD_PATH}}
-        include: LLVM-Unit.*(${{inputs.include-only}})
+        include: ${{inputs.include-only}}
         exclude: ${{inputs.exclude-reg}}
     - name: LLVM Regression Tests
       if: inputs.enable-tests == 'true'
@@ -110,7 +110,7 @@ runs:
         targets: clang-test-depends clang
         path: ${{env.CLANG_PATH}}/test 
         working-dir: ${{env.BUILD_PATH}}
-        include: Clang-Unit.*(${{inputs.include-only}})
+        include: ${{inputs.include-only}}
         exclude: ${{inputs.exclude-reg}}
         lit-args: --allow-empty-runs
     - name: Clang Regression Tests
