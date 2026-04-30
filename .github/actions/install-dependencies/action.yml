@@ -8,7 +8,7 @@ runs:
       name: Install utilities
       shell: bash
       run: |
-        brew install texinfo binutils
+        brew install texinfo binutils ninja ccache
     - if: runner.os == 'macOS' && matrix.platform == 'macos-13'
       name: Add utilities to PATH
       shell: bash
@@ -33,6 +33,19 @@ runs:
         which ar
         tar --version     
         ar --version
+    - if: runner.os == 'Linux'
+      name: Install build tools (Linux)
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build ccache
+
+    - name: Verify build tools installation
+      shell: bash
+      run: |
+        echo "Ninja version:" && ninja --version
+        echo "ccache version:" && ccache --version
+
     - name: Create Installation Directory
       shell: bash
       run: mkdir -p $INSTALL_PATH

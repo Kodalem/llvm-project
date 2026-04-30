@@ -13,7 +13,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  J: -j2
+  J: -j64 # We should use all of the CPU... when running any Runners, waste not, want not, pricing is per-minute per Runner anyways.
   BUILD_PATH: build
   INSTALL_PATH: build/local
   LLVM_PATH: llvm
@@ -26,7 +26,7 @@ env:
   BENCH_BUILD_PATH: build-bench
   CET_TESTS_PATH: patmos-cet-test-suite
   LLD_PATH: lld
-  
+
 jobs:
   test-non-patmos:
     name: Test Non-Patmos
@@ -38,12 +38,12 @@ jobs:
       CXX: g++
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-dependencies
       - name: Build and Run LLVM Unit and Regression Tests
         uses: ./.github/actions/build-test-all
         with:
           targets: X86
           enable-assertions: true
-          # Exclude known failing tests
           exclude-reg: "(Clang :: Lexer/case-insensitive-include.c)|(Clang :: Lexer/case-insensitive-system-include.c)|(Clang :: Modules/inferred-framework-case.m)|(Clang :: Preprocessor/nonportable-include-with-hmap.c)"
           include-only: "."
           default-target: x86_64-unknown-linux-gnu
@@ -53,6 +53,73 @@ jobs:
         working-directory: ${{env.BUILD_PATH}}
         run: make $J llc llvm-link clang llvm-config llvm-objdump opt
   
+  test-non-patmos-cmake:
+    name: Test Non-Patmos (CMake + Ninja)
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+    env:
+      CC: gcc
+      CXX: g++
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-dependencies
+      - uses: ./.github/actions/build-cmake-ninja
+        with:
+          targets: X86
+          default-target: x86_64-unknown-linux-gnu
+          enable-assertions: true
+          exclude-reg: "(Clang :: Lexer/case-insensitive-include.c)|(Clang :: Lexer/case-insensitive-system-include.c)|(Clang :: Modules/inferred-framework-case.m)|(Clang :: Preprocessor/nonportable-include-with-hmap.c)"
+          include-only: "."
+          compiler-rt-tests: X86_64LinuxConfig
+          enable-package: false
+          enable-tests: true
+          parallelism: '64'
+
+
+  package-patmos-cmake:
+    name: Build, Test, and Package with CMake + Ninja (${{matrix.platform}})
+    runs-on: ${{matrix.platform}}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-latest
+            cc: gcc
+            cxx: g++
+          - platform: ubuntu-22.04
+            cc: gcc
+            cxx: g++
+          - platform: macos-latest # ARM
+            cc: clang
+            cxx: clang++
+          - platform: macos-14 # ARM
+            cc: clang
+            cxx: clang++
+          - platform: namespace-profile-llvm
+            cc: clang
+            cxx: clang++
+
+    env:
+      CC: ${{matrix.cc}}
+      CXX: ${{matrix.cxx}}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-dependencies
+      - uses: ./.github/actions/build-cmake-ninja
+        with:
+          targets: Patmos
+          default-target: patmos-unknown-unknown-elf
+          enable-assertions: true
+          exclude-reg: ""
+          include-only: Patmos
+          compiler-rt-tests: patmos
+          enable-package: true
+          enable-tests: true
+          artifact-name: package-${{matrix.platform}}
+          parallelism: '64'
+
   package-patmos:
     name: Build, Test, and Package (${{matrix.platform}})
     runs-on: ${{matrix.platform}}
@@ -83,12 +150,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-dependencies
-      - name: Build and Run LLVM Unit and Regression Tests
+      - name: Build with Make, Run LLVM Unit and Regression Tests, and Package
         uses: ./.github/actions/build-test-all
         with:
           enable-assertions: true
           artifact-name: package-${{matrix.platform}}
-  
+
   test-benchmarks:
     name: Test Benchmarks (${{matrix.platform}})
     runs-on: ${{matrix.platform}}
@@ -131,14 +198,20 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        include: 
+        include:
+          - platform: ubuntu-latest
+            cc: gcc
+            cxx: g++
           - platform: ubuntu-22.04
             cc: gcc
             cxx: g++
-          - platform: macos-14
+          - platform: macos-latest # ARM
             cc: clang
             cxx: clang++
-          - platform: macos-13
+          - platform: macos-14 # ARM
+            cc: clang
+            cxx: clang++
+          - platform: namespace-profile-llvm
             cc: clang
             cxx: clang++
     # Run after the test jobs finish      
@@ -165,4 +238,55 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{env.BUILD_PATH}}/patmos-unknown-unknown-elf/package-temp/patmos-llvm-*.tar.gz
-      
+
+  release-cmake:
+    name: Release with CMake + Ninja (${{matrix.platform}})
+    runs-on: ${{matrix.platform}}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: ubuntu-latest
+            cc: gcc
+            cxx: g++
+          - platform: ubuntu-22.04
+            cc: gcc
+            cxx: g++
+          - platform: macos-latest # ARM
+            cc: clang
+            cxx: clang++
+          - platform: macos-14 # ARM
+            cc: clang
+            cxx: clang++
+          - platform: namespace-profile-llvm
+            cc: clang
+            cxx: clang++
+    # Run after the test jobs finish
+    needs: [package-patmos-cmake, test-benchmarks, test-non-patmos-cmake]
+    # Run only if this was triggered by a tag
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    env:
+      CC: ${{matrix.cc}}
+      CXX: ${{matrix.cxx}}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-dependencies
+      - uses: ./.github/actions/build-cmake-ninja
+        with:
+          targets: Patmos
+          default-target: patmos-unknown-unknown-elf
+          enable-assertions: true
+          exclude-reg: ""
+          include-only: Patmos
+          compiler-rt-tests: patmos
+          enable-package: true
+          enable-tests: false
+          artifact-name: package-${{matrix.platform}}-release
+          parallelism: '64'
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{env.BUILD_PATH}}/patmos-unknown-unknown-elf/package-temp/patmos-llvm-*.tar.gz
