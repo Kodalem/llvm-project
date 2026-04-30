@@ -87,7 +87,7 @@ runs:
           # Use --show-tests to list tests and grep the composed regex.
           # Save to a file first to prevent BrokenPipeError in llvm-lit when grep exits early
           ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH --show-tests > discovered-tests.txt || true
-          if ! grep -E -m1 "$FILTER" discovered-tests.txt >/dev/null 2>&1; then
+          if ! python3 -c "import sys, re; sys.exit(0 if any(re.search(r'$FILTER', line) for line in sys.stdin) else 1)" < discovered-tests.txt; then
             echo "ERROR: filter did not match any tests: $FILTER"
             echo "Set DEBUG_LIT_SHOW=1 to list discovered tests for debugging."
             exit 2
