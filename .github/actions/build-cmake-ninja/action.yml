@@ -117,7 +117,7 @@ runs:
         PARALLELISM: ${{ inputs.parallelism }}
       run: |
         echo "Building with $PARALLELISM parallel jobs..."
-        ninja -j $PARALLELISM all 2>&1 | head -100
+        ninja -j $PARALLELISM all -v
         echo "Build complete!"
 
     - name: Report ccache statistics
