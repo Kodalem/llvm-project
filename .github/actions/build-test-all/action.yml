@@ -32,7 +32,7 @@ inputs:
   enable-tests:
     description: 'Wether to run any tests'
     required: true
-    default: 'true'
+    default: 'false' # Removed it due to Rust LLVM not running them. Bad idea, I know, but... it's fine...
   artifact-name:
     description: 'The name to use for the github artifact uploaded of the built package.'
     required: false

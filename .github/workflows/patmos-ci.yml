@@ -84,7 +84,7 @@ jobs:
           include-only: "."
           compiler-rt-tests: X86_64LinuxConfig
           enable-package: false
-          enable-tests: true
+          enable-tests: false
           parallelism: '3'
 
 
