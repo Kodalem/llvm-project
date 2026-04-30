@@ -39,7 +39,7 @@ inputs:
   parallelism:
     description: 'Number of parallel jobs for builds'
     required: false
-    default: '16'
+    default: '4'
 
 runs:
   using: "composite"

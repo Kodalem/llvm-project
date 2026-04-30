@@ -63,6 +63,17 @@ jobs:
       CXX: g++
     steps:
       - uses: actions/checkout@v4
+      - name: Cache CMake/Ninja build state (GitHub)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.BUILD_PATH }}/
+            ${{ env.COMPILER_RT_BUILD_PATH }}/
+            ~/.ccache/
+          key: ${{ runner.os }}-test-non-patmos-cmake-${{ hashFiles('llvm/CMakeLists.txt', 'clang/CMakeLists.txt', 'compiler-rt/CMakeLists.txt', '.github/actions/build-cmake-ninja/action.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-test-non-patmos-cmake-
+            ${{ runner.os }}-
       - uses: ./.github/actions/install-dependencies
       - uses: ./.github/actions/build-cmake-ninja
         with:
@@ -74,7 +85,7 @@ jobs:
           compiler-rt-tests: X86_64LinuxConfig
           enable-package: false
           enable-tests: true
-          parallelism: '64'
+          parallelism: '3'
 
 
   package-patmos-cmake:
@@ -87,25 +98,62 @@ jobs:
           - platform: ubuntu-latest
             cc: gcc
             cxx: g++
+            parallelism: '3'
           - platform: ubuntu-22.04
             cc: gcc
             cxx: g++
+            parallelism: '3'
           - platform: macos-latest # ARM
             cc: clang
             cxx: clang++
+            parallelism: '3'
           - platform: macos-14 # ARM
             cc: clang
             cxx: clang++
+            parallelism: '3'
           - platform: namespace-profile-llvm
             cc: clang
             cxx: clang++
+            parallelism: '4'
 
     env:
       CC: ${{matrix.cc}}
       CXX: ${{matrix.cxx}}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout with Namespace Git mirror
+        if: contains(matrix.platform, 'namespace-profile')
+        uses: namespacelabs/nscloud-checkout-action@v8
+        with:
+          fetch-depth: 10
+      - name: Checkout (GitHub-hosted runners)
+        if: ${{ !contains(matrix.platform, 'namespace-profile') }}
+        uses: actions/checkout@v4
+      - name: Cache build state (Namespace cache volume)
+        if: contains(matrix.platform, 'namespace-profile')
+        uses: namespacelabs/nscloud-cache-action@v1
+        with:
+          path: |
+            ${{ env.BUILD_PATH }}/
+            ${{ env.COMPILER_RT_BUILD_PATH }}/
+            ${{ env.NEWLIB_BUILD_PATH }}/
+            ${{ env.BENCH_BUILD_PATH }}/
+            ~/.ccache/
+      - name: Cache build state (GitHub cache)
+        if: ${{ !contains(matrix.platform, 'namespace-profile') }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.BUILD_PATH }}/
+            ${{ env.COMPILER_RT_BUILD_PATH }}/
+            ${{ env.NEWLIB_BUILD_PATH }}/
+            ${{ env.BENCH_BUILD_PATH }}/
+            ~/.ccache/
+          key: ${{ runner.os }}-${{ matrix.platform }}-package-cmake-${{ hashFiles('**/CMakeLists.txt', '**/configure', '.github/actions/build-cmake-ninja/action.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.platform }}-package-cmake-
+            ${{ runner.os }}-${{ matrix.platform }}-
+            ${{ runner.os }}-
       - uses: ./.github/actions/install-dependencies
       - uses: ./.github/actions/build-cmake-ninja
         with:
@@ -118,7 +166,7 @@ jobs:
           enable-package: true
           enable-tests: true
           artifact-name: package-${{matrix.platform}}
-          parallelism: '64'
+          parallelism: ${{ matrix.parallelism }}
 
   package-patmos:
     name: Build, Test, and Package (${{matrix.platform}})
@@ -148,7 +196,37 @@ jobs:
       CXX: ${{matrix.cxx}}
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout with Namespace Git mirror
+        if: contains(matrix.platform, 'namespace-profile')
+        uses: namespacelabs/nscloud-checkout-action@v8
+        with:
+          fetch-depth: 10
+      - name: Checkout (GitHub-hosted runners)
+        if: ${{ !contains(matrix.platform, 'namespace-profile') }}
+        uses: actions/checkout@v4
+      - name: Cache build state (Namespace cache volume)
+        if: contains(matrix.platform, 'namespace-profile')
+        uses: namespacelabs/nscloud-cache-action@v1
+        with:
+          path: |
+            ${{ env.BUILD_PATH }}/
+            ${{ env.COMPILER_RT_BUILD_PATH }}/
+            ${{ env.NEWLIB_BUILD_PATH }}/
+            ~/.ccache/
+      - name: Cache build state (GitHub cache)
+        if: ${{ !contains(matrix.platform, 'namespace-profile') }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.BUILD_PATH }}/
+            ${{ env.COMPILER_RT_BUILD_PATH }}/
+            ${{ env.NEWLIB_BUILD_PATH }}/
+            ~/.ccache/
+          key: ${{ runner.os }}-${{ matrix.platform }}-package-make-${{ hashFiles('**/CMakeLists.txt', '**/configure', '.github/actions/build-test-all/action.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.platform }}-package-make-
+            ${{ runner.os }}-${{ matrix.platform }}-
+            ${{ runner.os }}-
       - uses: ./.github/actions/install-dependencies
       - name: Build with Make, Run LLVM Unit and Regression Tests, and Package
         uses: ./.github/actions/build-test-all
@@ -184,7 +262,35 @@ jobs:
       CXX: ${{matrix.cxx}}
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout with Namespace Git mirror
+        if: contains(matrix.platform, 'namespace-profile')
+        uses: namespacelabs/nscloud-checkout-action@v8
+        with:
+          fetch-depth: 10
+      - name: Checkout (GitHub-hosted runners)
+        if: ${{ !contains(matrix.platform, 'namespace-profile') }}
+        uses: actions/checkout@v4
+      - name: Cache benchmark/build state (Namespace cache volume)
+        if: contains(matrix.platform, 'namespace-profile')
+        uses: namespacelabs/nscloud-cache-action@v1
+        with:
+          path: |
+            ${{ env.BUILD_PATH }}/
+            ${{ env.BENCH_BUILD_PATH }}/
+            ~/.ccache/
+      - name: Cache benchmark/build state (GitHub cache)
+        if: ${{ !contains(matrix.platform, 'namespace-profile') }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.BUILD_PATH }}/
+            ${{ env.BENCH_BUILD_PATH }}/
+            ~/.ccache/
+          key: ${{ runner.os }}-${{ matrix.platform }}-bench-${{ hashFiles('**/CMakeLists.txt', '.github/actions/test-benchmarks/action.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.platform }}-bench-
+            ${{ runner.os }}-${{ matrix.platform }}-
+            ${{ runner.os }}-
       - uses: ./.github/actions/install-dependencies
       - name: Build and Run LLVM Unit and Regression Tests
         uses: ./.github/actions/test-benchmarks
@@ -225,7 +331,37 @@ jobs:
       CXX: ${{matrix.cxx}}
     
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout with Namespace Git mirror
+        if: contains(matrix.platform, 'namespace-profile')
+        uses: namespacelabs/nscloud-checkout-action@v8
+        with:
+          fetch-depth: 1
+      - name: Checkout (GitHub-hosted runners)
+        if: ${{ !contains(matrix.platform, 'namespace-profile') }}
+        uses: actions/checkout@v4
+      - name: Cache toolchains/build state (Namespace cache volume)
+        if: contains(matrix.platform, 'namespace-profile')
+        uses: namespacelabs/nscloud-cache-action@v1
+        with:
+          path: |
+            ${{ env.BUILD_PATH }}/
+            ${{ env.COMPILER_RT_BUILD_PATH }}/
+            ${{ env.NEWLIB_BUILD_PATH }}/
+            ~/.ccache/
+      - name: Cache toolchains/build state (GitHub cache)
+        if: ${{ !contains(matrix.platform, 'namespace-profile') }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.BUILD_PATH }}/
+            ${{ env.COMPILER_RT_BUILD_PATH }}/
+            ${{ env.NEWLIB_BUILD_PATH }}/
+            ~/.ccache/
+          key: ${{ runner.os }}-${{ matrix.platform }}-release-make-${{ hashFiles('**/CMakeLists.txt', '**/configure', '.github/actions/build-test-all/action.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.platform }}-release-make-
+            ${{ runner.os }}-${{ matrix.platform }}-
+            ${{ runner.os }}-
       - uses: ./.github/actions/install-dependencies
       - name: Build LLVM, Compiler-RT, Newlib, and Package
         uses: ./.github/actions/build-test-all
@@ -251,18 +387,23 @@ jobs:
           - platform: ubuntu-latest
             cc: gcc
             cxx: g++
+            parallelism: '3'
           - platform: ubuntu-22.04
             cc: gcc
             cxx: g++
+            parallelism: '3'
           - platform: macos-latest # ARM
             cc: clang
             cxx: clang++
+            parallelism: '3'
           - platform: macos-14 # ARM
             cc: clang
             cxx: clang++
+            parallelism: '3'
           - platform: namespace-profile-llvm
             cc: clang
             cxx: clang++
+            parallelism: '4'
     # Run after the test jobs finish
     needs: [package-patmos-cmake, test-benchmarks, test-non-patmos-cmake]
     # Run only if this was triggered by a tag
@@ -272,7 +413,37 @@ jobs:
       CXX: ${{matrix.cxx}}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout with Namespace Git mirror
+        if: contains(matrix.platform, 'namespace-profile')
+        uses: namespacelabs/nscloud-checkout-action@v8
+        with:
+          fetch-depth: 1
+      - name: Checkout (GitHub-hosted runners)
+        if: ${{ !contains(matrix.platform, 'namespace-profile') }}
+        uses: actions/checkout@v4
+      - name: Cache toolchains/build state (Namespace cache volume)
+        if: contains(matrix.platform, 'namespace-profile')
+        uses: namespacelabs/nscloud-cache-action@v1
+        with:
+          path: |
+            ${{ env.BUILD_PATH }}/
+            ${{ env.COMPILER_RT_BUILD_PATH }}/
+            ${{ env.NEWLIB_BUILD_PATH }}/
+            ~/.ccache/
+      - name: Cache toolchains/build state (GitHub cache)
+        if: ${{ !contains(matrix.platform, 'namespace-profile') }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.BUILD_PATH }}/
+            ${{ env.COMPILER_RT_BUILD_PATH }}/
+            ${{ env.NEWLIB_BUILD_PATH }}/
+            ~/.ccache/
+          key: ${{ runner.os }}-${{ matrix.platform }}-release-cmake-${{ hashFiles('**/CMakeLists.txt', '**/configure', '.github/actions/build-cmake-ninja/action.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.platform }}-release-cmake-
+            ${{ runner.os }}-${{ matrix.platform }}-
+            ${{ runner.os }}-
       - uses: ./.github/actions/install-dependencies
       - uses: ./.github/actions/build-cmake-ninja
         with:
@@ -285,7 +456,7 @@ jobs:
           enable-package: true
           enable-tests: false
           artifact-name: package-${{matrix.platform}}-release
-          parallelism: '64'
+          parallelism: ${{ matrix.parallelism }}
       - name: Publish
         uses: softprops/action-gh-release@v2
         with:
