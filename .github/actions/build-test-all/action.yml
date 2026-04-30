@@ -140,6 +140,7 @@ runs:
       run: |
         cmake $GITHUB_WORKSPACE/$COMPILER_RT_PATH \
           -DCOMPILER_RT_INCLUDE_TESTS=ON \
+          -DCOMPILER_RT_TEST_STANDALONE_BUILD_LIBS=OFF \
           -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
           -DCOMPILER_RT_TEST_COMPILER="$GITHUB_WORKSPACE/$BUILD_PATH/bin/clang" \
           -DLLVM_CONFIG_PATH="$GITHUB_WORKSPACE/$BUILD_PATH/bin/llvm-config" \
@@ -159,7 +160,8 @@ runs:
           -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/$COMPILER_RT_PATH/cmake/patmos-clang-toolchain.cmake" \
           -DLLVM_TOOLS_DIR="$GITHUB_WORKSPACE/$BUILD_PATH/bin" \
           -DLLVM_CONFIG_PATH="$GITHUB_WORKSPACE/$BUILD_PATH/bin/llvm-config" \
-          -DCOMPILER_RT_INCLUDE_TESTS=ON
+          -DCOMPILER_RT_INCLUDE_TESTS=ON \
+          -DCOMPILER_RT_TEST_STANDALONE_BUILD_LIBS=OFF
     - name: Compiler-RT Unit Tests
       uses: ./.github/actions/build-test
       with:

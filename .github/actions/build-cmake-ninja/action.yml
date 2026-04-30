@@ -185,6 +185,7 @@ runs:
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
           -DCOMPILER_RT_INCLUDE_TESTS=ON \
+          -DCOMPILER_RT_TEST_STANDALONE_BUILD_LIBS=OFF \
           -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
           -DCOMPILER_RT_TEST_COMPILER="$GITHUB_WORKSPACE/$BUILD_PATH/bin/clang" \
           -DLLVM_CONFIG_PATH="$GITHUB_WORKSPACE/$BUILD_PATH/bin/llvm-config" \
@@ -207,7 +208,8 @@ runs:
           -DCMAKE_PROGRAM_PATH="$GITHUB_WORKSPACE/$BUILD_PATH/bin" \
           -DLLVM_TOOLS_DIR="$GITHUB_WORKSPACE/$BUILD_PATH/bin" \
           -DLLVM_CONFIG_PATH="$GITHUB_WORKSPACE/$BUILD_PATH/bin/llvm-config" \
-          -DCOMPILER_RT_INCLUDE_TESTS=ON
+          -DCOMPILER_RT_INCLUDE_TESTS=ON \
+          -DCOMPILER_RT_TEST_STANDALONE_BUILD_LIBS=OFF
 
     - name: Build Compiler-RT Tests
       if: inputs.enable-tests == 'true'
