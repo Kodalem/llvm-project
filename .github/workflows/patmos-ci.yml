@@ -13,7 +13,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  J: -j64 # We should use all of the CPU... when running any Runners, waste not, want not, pricing is per-minute per Runner anyways.
+  J: -j3 # NOPE, DO NOT TOUCH THIS, MORE THAN 3 JOBS WILL CRASH THE CI/CD
   BUILD_PATH: build
   INSTALL_PATH: build/local
   LLVM_PATH: llvm
