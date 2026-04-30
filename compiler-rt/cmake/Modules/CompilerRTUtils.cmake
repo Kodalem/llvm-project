@@ -316,10 +316,16 @@ macro(load_llvm_config)
   # provided LLVM_CONFIG_PATH, fall back to querying llvm-config (legacy
   # behavior). Suppress certain warnings for Patmos targets where upstream
   # LLVM packaging may not provide optional components like XRay.
+  #
+  # Bare-metal targets (CMAKE_SYSTEM_NAME Generic) are not expected to have a working
+  # find_package(LLVM) configuration, so skip it to avoid spurious warnings.
+  # Sanity lost: 16 hours, waiting. Gained? None.
   set(FOUND_LLVM_CMAKE_DIR FALSE)
   set(LLVM_FOUND FALSE)
 
-  find_package(LLVM HINTS "${LLVM_CMAKE_DIR}")
+  if (NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
+    find_package(LLVM HINTS "${LLVM_CMAKE_DIR}")
+  endif()
   if (LLVM_FOUND)
     list(APPEND CMAKE_MODULE_PATH "${LLVM_DIR}")
     # Turn into CACHE PATHs for overwritting
@@ -446,11 +452,13 @@ macro(load_llvm_config)
         endif()
 
         set(LLVM_CMAKE_INCLUDE_FILE "${LLVM_CMAKE_DIR}/LLVMConfig.cmake")
-        if (EXISTS "${LLVM_CMAKE_INCLUDE_FILE}")
+        if (EXISTS "${LLVM_CMAKE_INCLUDE_FILE}" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
+          # Non-bare-metal: include LLVMConfig.cmake normally.
           list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
           include("${LLVM_CMAKE_INCLUDE_FILE}")
           set(FOUND_LLVM_CMAKE_DIR TRUE)
           set(LLVM_FOUND TRUE)
+        elseif (CMAKE_SYSTEM_NAME STREQUAL "Generic")
         else()
           message(WARNING "LLVM CMake path (${LLVM_CMAKE_INCLUDE_FILE}) reported by llvm-config does not exist")
         endif()
