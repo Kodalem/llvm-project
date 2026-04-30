@@ -52,16 +52,46 @@ runs:
         TEST_PATH: ${{ inputs.path }}
         LIT_ARGS: ${{ inputs.lit-args }}
       run: |
-        if [ ! -z "$EXCLUDE" ]; then
-          # Split paranthesis to avoid the shell treating it as an executable
-          EXCLUDE_FILTER="^(?!("
-          EXCLUDE_FILTER="${EXCLUDE_FILTER}$EXCLUDE"
-          EXCLUDE_FILTER="${EXCLUDE_FILTER})).*"
+        # Build a safe filter only when useful. Avoid passing an empty/garbled
+        # filter string to llvm-lit which can cause unexpected "no match" errors.
+        PRE_FILTER=""
+        FILTER=""
+
+        if [ -n "$EXCLUDE" ]; then
+          # Negative lookahead for excludes (keeps the rest generic)
+          EXCLUDE_FILTER="^(?!($EXCLUDE)).*"
         fi
-        FILTER="$EXCLUDE_FILTER($INCLUDE)"
-        if [ ! -z "$FILTER" ]; then
-          echo "Filter: $FILTER"
+
+        # If INCLUDE is provided and not set to '.' (meaning "all"), build a
+        # composed filter. Otherwise do not pass any --filter at all.
+        if [ -n "$INCLUDE" ] && [ "$INCLUDE" != "." ]; then
+          if [ -n "$EXCLUDE_FILTER" ]; then
+            FILTER="${EXCLUDE_FILTER}(${INCLUDE})"
+          else
+            FILTER="(${INCLUDE})"
+          fi
           PRE_FILTER="--filter"
+          echo "Filter: $FILTER"
         fi
-        ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH "$PRE_FILTER" "$FILTER" $LIT_ARGS
+
+        # Optional debug: dump discovered tests when DEBUG_LIT_SHOW=1
+        if [ "${DEBUG_LIT_SHOW:-0}" = "1" ]; then
+          echo "Showing discovered tests (first 200):"
+          ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH --show-tests | head -200 || true
+        fi
+
+        # Before running llvm-lit, ensure the filter (if any) actually
+        # matches tests. This avoids allowing empty runs silently.
+        if [ -n "$PRE_FILTER" ]; then
+          echo "Checking for tests matching filter..."
+          # Use --show-tests to list tests and grep the composed regex.
+          if ! ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH --show-tests | grep -E "$FILTER" -m1 >/dev/null 2>&1; then
+            echo "ERROR: filter did not match any tests: $FILTER"
+            echo "Set DEBUG_LIT_SHOW=1 to list discovered tests for debugging."
+            exit 2
+          fi
+          ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH "$PRE_FILTER" "$FILTER" $LIT_ARGS
+        else
+          ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH $LIT_ARGS
+        fi
 

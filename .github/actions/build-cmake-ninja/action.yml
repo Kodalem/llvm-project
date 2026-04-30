@@ -156,7 +156,7 @@ runs:
         targets: ''
         path: ${{env.LLVM_PATH}}/test
         working-dir: ${{env.BUILD_PATH}}
-        include: LLVM-Unit.*(${{inputs.include-only}})
+        include: ${{inputs.include-only}}
         exclude: ${{inputs.exclude-reg}}
         parallelism: ${{ inputs.parallelism }}
 
