@@ -85,7 +85,9 @@ runs:
         if [ -n "$PRE_FILTER" ]; then
           echo "Checking for tests matching filter..."
           # Use --show-tests to list tests and grep the composed regex.
-          if ! ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH --show-tests | grep -E "$FILTER" -m1 >/dev/null 2>&1; then
+          # Save to a file first to prevent BrokenPipeError in llvm-lit when grep exits early
+          ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH --show-tests > discovered-tests.txt || true
+          if ! grep -E -m1 "$FILTER" discovered-tests.txt >/dev/null 2>&1; then
             echo "ERROR: filter did not match any tests: $FILTER"
             echo "Set DEBUG_LIT_SHOW=1 to list discovered tests for debugging."
             exit 2

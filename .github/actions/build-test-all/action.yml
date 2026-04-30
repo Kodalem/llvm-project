@@ -157,7 +157,6 @@ runs:
       run: |
         cmake $GITHUB_WORKSPACE/$COMPILER_RT_PATH \
           -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/$COMPILER_RT_PATH/cmake/patmos-clang-toolchain.cmake" \
-          -DCMAKE_PROGRAM_PATH="$GITHUB_WORKSPACE/$BUILD_PATH/bin" \
           -DLLVM_TOOLS_DIR="$GITHUB_WORKSPACE/$BUILD_PATH/bin" \
           -DLLVM_CONFIG_PATH="$GITHUB_WORKSPACE/$BUILD_PATH/bin/llvm-config" \
           -DCOMPILER_RT_INCLUDE_TESTS=ON
@@ -169,6 +168,7 @@ runs:
         working-dir: ${{env.COMPILER_RT_BUILD_PATH}}
         exclude: ${{inputs.exclude-reg}}
         enable-tests: ${{ inputs.enable-tests }}
+        lit-args: --param=llvm_tools_dir=$GITHUB_WORKSPACE/${{env.BUILD_PATH}}/bin
     - name: Download Newlib
       if: inputs.enable-package == 'true'
       env:

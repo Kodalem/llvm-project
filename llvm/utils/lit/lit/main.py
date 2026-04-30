@@ -179,25 +179,32 @@ def create_params(builtin_params, user_params):
 def print_discovered(tests, show_suites, show_tests):
     tests.sort(key=lit.reports.by_suite_and_test_path)
 
-    if show_suites:
-        tests_by_suite = itertools.groupby(tests, lambda t: t.suite)
-        print("-- Test Suites --")
-        for suite, test_iter in tests_by_suite:
-            test_count = sum(1 for _ in test_iter)
-            print("  %s - %d tests" % (suite.name, test_count))
-            print("    Source Root: %s" % suite.source_root)
-            print("    Exec Root  : %s" % suite.exec_root)
-            features = " ".join(sorted(suite.config.available_features))
-            print("    Available Features: %s" % features)
-            substitutions = sorted(suite.config.substitutions)
-            substitutions = ("%s => %s" % (x, y) for (x, y) in substitutions)
-            substitutions = "\n".ljust(30).join(substitutions)
-            print("    Available Substitutions: %s" % substitutions)
+    try:
+        if show_suites:
+            tests_by_suite = itertools.groupby(tests, lambda t: t.suite)
+            print("-- Test Suites --")
+            for suite, test_iter in tests_by_suite:
+                test_count = sum(1 for _ in test_iter)
+                print("  %s - %d tests" % (suite.name, test_count))
+                print("    Source Root: %s" % suite.source_root)
+                print("    Exec Root  : %s" % suite.exec_root)
+                features = " ".join(sorted(suite.config.available_features))
+                print("    Available Features: %s" % features)
+                substitutions = sorted(suite.config.substitutions)
+                substitutions = ("%s => %s" % (x, y) for (x, y) in substitutions)
+                substitutions = "\n".ljust(30).join(substitutions)
+                print("    Available Substitutions: %s" % substitutions)
 
-    if show_tests:
-        print("-- Available Tests --")
-        for t in tests:
-            print("  %s" % t.getFullName())
+        if show_tests:
+            print("-- Available Tests --")
+            for t in tests:
+                print("  %s" % t.getFullName())
+    except BrokenPipeError:
+        # Consumer (grep/head) closed the pipe early. Exit successfully.
+        try:
+            sys.stdout.close()
+        finally:
+            sys.exit(0)
 
 
 def determine_order(tests, order):

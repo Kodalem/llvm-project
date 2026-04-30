@@ -55,6 +55,21 @@ runs:
           echo "Filter: $FILTER"
           PRE_FILTER="--filter"
         fi
-        ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH "$PRE_FILTER" "$FILTER" $LIT_ARGS
-    
-    
+        ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH --show-tests | head -200 || true
+
+        # Before running llvm-lit, ensure the filter (if any) actually
+        # matches tests. This avoids allowing empty runs silently.
+        if [ -n "$PRE_FILTER" ]; then
+          echo "Checking for tests matching filter..."
+          # Use --show-tests to list tests and grep the composed regex.
+          # Save to a file first to prevent BrokenPipeError in llvm-lit when grep exits early
+          ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH --show-tests > discovered-tests.txt || true
+          if ! grep -E -m1 "$FILTER" discovered-tests.txt >/dev/null 2>&1; then
+            echo "ERROR: filter did not match any tests: $FILTER"
+            echo "Set DEBUG_LIT_SHOW=1 to list discovered tests for debugging."
+            exit 2
+          fi
+          ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH "$PRE_FILTER" "$FILTER" $LIT_ARGS
+        else
+          ./bin/llvm-lit -v $GITHUB_WORKSPACE/$TEST_PATH $LIT_ARGS
+        fi
