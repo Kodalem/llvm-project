@@ -4,12 +4,12 @@ on:
   push:
     branches:
       - main
-      - patmos-llvm-22x-rusty
+      - patmos-llvm-22x-rusty*
   pull_request:
     branches:
       - main
-      - patmos-llvm-22x-rusty
-
+      - patmos-llvm-22x-rusty*
+      
 env:
   NIX_BUILD_CORES: 2
   CCACHE_DIR: ${{ github.workspace }}/.ccache
