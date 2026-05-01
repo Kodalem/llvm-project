@@ -44,20 +44,34 @@ jobs:
       - name: Install Patmos simulator tools (pasim)
         working-directory: llvm-project
         run: |
+          set -euo pipefail
           mkdir -p build/local
-          wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
+          wget -O build/local/patmos-simulator.tar.gz \
+            https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
           tar -xvf build/local/patmos-simulator.tar.gz -C build/local
-          PASIM_PATH="$(pwd)/build/local/bin/pasim"
-          if [ ! -x "$PASIM_PATH" ]; then
-            echo "Could not find executable pasim at $PASIM_PATH"
-            find "$(pwd)/build/local" -maxdepth 4 -type f | sort
+        
+          # Find simulator binary across naming/layout variations
+          PASIM_PATH=""
+          for cand in \
+            "$(pwd)/build/local/bin/pasim" \
+            "$(find "$(pwd)/build/local" -maxdepth 5 -type f \( -name pasim -o \) | head -n1)"; do
+            if [ -n "${cand:-}" ] && [ -x "$cand" ]; then
+              PASIM_PATH="$cand"
+              break
+            fi
+          done
+        
+          if [ -z "$PASIM_PATH" ]; then
+            echo "Could not find simulator executable (pasim/paasm) under $(pwd)/build/local"
+            find "$(pwd)/build/local" -maxdepth 5 -type f | sort
             exit 1
           fi
+        
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
-          PATH="$PASIM_DIR:$PATH" command -v pasim
+          PATH="$PASIM_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
           "$PASIM_PATH" --help >/dev/null
 
       - name: Smoke Check pasim (fail fast)
