@@ -1,0 +1,437 @@
+name: LLVM Patmos CI - Optimized
+
+on:
+  push:
+    branches:
+      - main
+      - patmos-llvm-22x-rusty
+  pull_request:
+    branches:
+      - main
+      - patmos-llvm-22x-rusty
+
+env:
+  NIX_BUILD_CORES: 2
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_BASEDIR: ${{ github.workspace }}
+  CCACHE_COMPILERCHECK: content
+  CCACHE_MAXSIZE: 20G
+
+jobs:
+  build-llvm:
+    name: Build LLVM
+    runs-on: namespace-profile-beta-cicd
+    timeout-minutes: 240
+
+    steps:
+      - name: Checkout LLVM monorepo
+        uses: namespacelabs/nscloud-checkout-action@v8
+        with:
+          path: llvm-project
+          fetch-depth: 10
+
+      - name: Prepare cache directories
+        run: |
+          mkdir -p "$CCACHE_DIR"
+          mkdir -p llvm-project/build
+
+      - name: Ensure build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ccache
+
+      - name: Configure Namespace cache volume
+        uses: namespacelabs/nscloud-cache-action@v1
+        with:
+          path: |
+            ${{ env.CCACHE_DIR }}
+            llvm-project/build/
+            llvm-project/build-compiler-rt/
+            llvm-project/build-newlib/
+            llvm-project/build-bench/
+
+      - name: Show ccache config (pre-build)
+        run: |
+          ccache --show-config || true
+          ccache -s || true
+
+      - name: Configure LLVM
+        working-directory: llvm-project
+        run: |
+          cmake -S llvm -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_ENABLE_ASSERTIONS=ON \
+            -DLLVM_TARGETS_TO_BUILD=Patmos \
+            -DLLVM_DEFAULT_TARGET_TRIPLE=patmos-unknown-unknown-elf \
+            -DLLVM_ENABLE_PROJECTS="clang;lld" \
+            -DCLANG_ENABLE_OBJC_REWRITER=OFF \
+            -DCLANG_ENABLE_STATIC_ANALYZER=OFF \
+            -DCLANG_BUILD_EXAMPLES=OFF \
+            -DLLVM_ENABLE_BINDINGS=OFF \
+            -DLLVM_INSTALL_BINUTILS_SYMLINKS=OFF \
+            -DLLVM_INSTALL_CCTOOLS_SYMLINKS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_APPEND_VC_REV=OFF \
+            -DLLVM_ENABLE_WARNINGS=OFF \
+            -DLLVM_ENABLE_PEDANTIC=OFF \
+            -DLLVM_ENABLE_LIBPFM=OFF \
+            -DLLVM_BUILD_INSTRUMENTED_COVERAGE=OFF \
+            -DLLVM_INSTALL_UTILS=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Build LLVM
+        working-directory: llvm-project
+        run: cmake --build build -- -j"$NIX_BUILD_CORES"
+
+      - name: Test LLVM (Patmos-filtered)
+        working-directory: llvm-project
+        run: ./build/bin/llvm-lit ./llvm/test -v --filter=Patmos
+
+      - name: Package toolchain payload (small artifact for downstream jobs)
+        working-directory: llvm-project
+        run: |
+          mkdir -p toolchain-payload
+          cp -a build/bin toolchain-payload/
+          cp -a build/lib toolchain-payload/ || true
+          cp -a build/libexec toolchain-payload/ || true
+          tar -czf llvm-toolchain-payload.tar.gz -C toolchain-payload .
+
+      - name: Upload toolchain payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: llvm-toolchain-payload
+          path: llvm-project/llvm-toolchain-payload.tar.gz
+          retention-days: 1
+
+      - name: Upload CMake/Ninja logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llvm-build-logs
+          path: |
+            llvm-project/build/CMakeCache.txt
+            llvm-project/build/CMakeFiles/CMakeOutput.log
+            llvm-project/build/CMakeFiles/CMakeError.log
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Show ccache stats (post-build)
+        if: always()
+        run: ccache -s || true
+
+  build-newlib:
+    name: Build Newlib
+    needs: build-llvm
+    runs-on: namespace-profile-beta-cicd
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout LLVM monorepo (for consistent workspace layout)
+        uses: namespacelabs/nscloud-checkout-action@v8
+        with:
+          path: llvm-project
+
+      - name: Download LLVM toolchain payload
+        uses: actions/download-artifact@v4
+        with:
+          name: llvm-toolchain-payload
+          path: llvm-project
+
+      - name: Unpack LLVM toolchain payload
+        working-directory: llvm-project
+        run: |
+          mkdir -p build
+          tar -xzf llvm-toolchain-payload.tar.gz -C build
+
+      - name: Clone Patmos-Newlib
+        working-directory: llvm-project
+        run: git clone https://github.com/t-crest/patmos-newlib
+
+      - name: Cache Newlib build directory
+        uses: namespacelabs/nscloud-cache-action@v1
+        with:
+          path: |
+            ${{ env.CCACHE_DIR }}
+            llvm-project/build-newlib/
+
+      - name: Configure and Build Newlib
+        working-directory: llvm-project
+        run: |
+          mkdir -p build-newlib
+          cd build-newlib
+          ../patmos-newlib/configure \
+            --target=patmos-unknown-unknown-elf \
+            --prefix=/usr \
+            AR_FOR_TARGET="$(pwd)/../build/bin/llvm-ar" \
+            CC_FOR_TARGET="$(pwd)/../build/bin/clang" \
+            CFLAGS_FOR_TARGET="-target patmos-unknown-unknown-elf -O2 -emit-llvm -Wno-error -Wno-error=deprecated-non-prototype -Wno-error=invalid-noreturn -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types" \
+            RANLIB_FOR_TARGET="$(pwd)/../build/bin/llvm-ranlib" \
+            LD_FOR_TARGET="$(pwd)/../build/bin/clang"
+          make -j"$NIX_BUILD_CORES"
+
+      - name: Install Newlib sysroot
+        working-directory: llvm-project
+        run: |
+          mkdir -p out/newlib-sysroot
+          cd build-newlib
+          make install DESTDIR="$(pwd)/../out/newlib-sysroot"
+
+      - name: Upload Newlib sysroot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: newlib-sysroot
+          path: llvm-project/out/newlib-sysroot
+          retention-days: 1
+
+  test-clang:
+    name: Test Clang
+    needs: [build-llvm, build-newlib]
+    runs-on: namespace-profile-beta-cicd
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout LLVM monorepo
+        uses: namespacelabs/nscloud-checkout-action@v8
+        with:
+          path: llvm-project
+
+      - name: Download LLVM toolchain payload
+        uses: actions/download-artifact@v4
+        with:
+          name: llvm-toolchain-payload
+          path: llvm-project
+
+      - name: Unpack LLVM toolchain payload
+        working-directory: llvm-project
+        run: |
+          mkdir -p build
+          tar -xzf llvm-toolchain-payload.tar.gz -C build
+
+      - name: Download Newlib sysroot
+        uses: actions/download-artifact@v4
+        with:
+          name: newlib-sysroot
+          path: llvm-project/out/newlib-sysroot
+
+      - name: Export toolchain and sysroot paths
+        working-directory: llvm-project
+        run: |
+          echo "${GITHUB_WORKSPACE}/llvm-project/build/bin" >> "$GITHUB_PATH"
+          echo "PATMOS_NEWLIB_SYSROOT=${GITHUB_WORKSPACE}/llvm-project/out/newlib-sysroot" >> "$GITHUB_ENV"
+          echo "PATMOS_NEWLIB_LIB=${GITHUB_WORKSPACE}/llvm-project/out/newlib-sysroot/usr/lib" >> "$GITHUB_ENV"
+          echo "PATMOS_NEWLIB_INCLUDE=${GITHUB_WORKSPACE}/llvm-project/out/newlib-sysroot/usr/include" >> "$GITHUB_ENV"
+
+      - name: Test Clang (Patmos-filtered, with Newlib sysroot)
+        working-directory: llvm-project
+        env:
+          PATMOS_NEWLIB_SYSROOT: ${{ env.PATMOS_NEWLIB_SYSROOT }}
+          PATMOS_NEWLIB_LIB: ${{ env.PATMOS_NEWLIB_LIB }}
+          PATMOS_NEWLIB_INCLUDE: ${{ env.PATMOS_NEWLIB_INCLUDE }}
+        run: ./build/bin/llvm-lit ./clang/test -v --filter=Patmos
+
+  test-lld:
+    name: Test LLD
+    needs: build-llvm
+    runs-on: namespace-profile-beta-cicd
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout LLVM monorepo
+        uses: namespacelabs/nscloud-checkout-action@v8
+        with:
+          path: llvm-project
+
+      - name: Download LLVM toolchain payload
+        uses: actions/download-artifact@v4
+        with:
+          name: llvm-toolchain-payload
+          path: llvm-project
+
+      - name: Unpack LLVM toolchain payload
+        working-directory: llvm-project
+        run: |
+          mkdir -p build
+          tar -xzf llvm-toolchain-payload.tar.gz -C build
+
+      - name: Test LLD (Patmos-filtered)
+        working-directory: llvm-project
+        run: ./build/bin/llvm-lit ./lld/test -v --filter=Patmos
+
+  build-compiler-rt:
+    name: Build Compiler-RT
+    needs: build-llvm
+    runs-on: namespace-profile-beta-cicd
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout LLVM monorepo
+        uses: namespacelabs/nscloud-checkout-action@v8
+        with:
+          path: llvm-project
+
+      - name: Ensure build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ccache
+
+      - name: Download LLVM toolchain payload
+        uses: actions/download-artifact@v4
+        with:
+          name: llvm-toolchain-payload
+          path: llvm-project
+
+      - name: Unpack LLVM toolchain payload
+        working-directory: llvm-project
+        run: |
+          mkdir -p build
+          tar -xzf llvm-toolchain-payload.tar.gz -C build
+
+      - name: Cache Compiler-RT build directory
+        uses: namespacelabs/nscloud-cache-action@v1
+        with:
+          path: |
+            ${{ env.CCACHE_DIR }}
+            llvm-project/build-compiler-rt/
+
+      - name: Configure Compiler-RT
+        working-directory: llvm-project
+        run: |
+          mkdir -p build-compiler-rt
+          cd build-compiler-rt
+          cmake ../compiler-rt \
+            -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=../compiler-rt/cmake/patmos-clang-toolchain.cmake \
+            -DCMAKE_C_COMPILER="$(pwd)/../build/bin/clang" \
+            -DCMAKE_CXX_COMPILER="$(pwd)/../build/bin/clang++" \
+            -DCOMPILER_RT_TEST_COMPILER="$(pwd)/../build/bin/clang" \
+            -DLLVM_TOOLS_BINARY_DIR="$(pwd)/../build/bin" \
+            -DLLVM_CONFIG_PATH="$(pwd)/../build/bin/llvm-config" \
+            -DCOMPILER_RT_INCLUDE_TESTS=ON \
+            -DCOMPILER_RT_TEST_STANDALONE_BUILD_LIBS=OFF
+
+      - name: Build Compiler-RT
+        working-directory: llvm-project
+        run: |
+          cd build-compiler-rt
+          ninja -j"$NIX_BUILD_CORES"
+
+      - name: Test Compiler-RT
+        working-directory: llvm-project
+        run: |
+          ./build/bin/llvm-lit -v ./build-compiler-rt/test/builtins/Unit/patmos
+
+      - name: Upload Compiler-RT build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiler-rt-build
+          path: llvm-project/build-compiler-rt
+          retention-days: 1
+
+  test-benchmarks:
+    name: Test Benchmarks
+    needs: [test-clang, test-lld, build-compiler-rt]
+    runs-on: namespace-profile-beta-cicd
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout LLVM monorepo
+        uses: namespacelabs/nscloud-checkout-action@v8
+        with:
+          path: llvm-project
+
+      - name: Cache benchmark/build state (Namespace cache volume)
+        uses: namespacelabs/nscloud-cache-action@v1
+        with:
+          path: |
+            llvm-project/build/
+            llvm-project/build-bench/
+            ~/.ccache/
+
+      - name: Download LLVM toolchain payload
+        uses: actions/download-artifact@v4
+        with:
+          name: llvm-toolchain-payload
+          path: llvm-project
+
+      - name: Unpack LLVM toolchain payload
+        working-directory: llvm-project
+        run: |
+          mkdir -p build
+          tar -xzf llvm-toolchain-payload.tar.gz -C build
+
+      - name: Download Newlib sysroot
+        uses: actions/download-artifact@v4
+        with:
+          name: newlib-sysroot
+          path: llvm-project/out/newlib-sysroot
+
+      - name: Download Compiler-RT build
+        uses: actions/download-artifact@v4
+        with:
+          name: compiler-rt-build
+          path: llvm-project/build-compiler-rt
+
+      - name: Clone benchmark suite
+        working-directory: llvm-project
+        env:
+          BENCH_COMMIT: 4d5a76ab65df952ac41dd2da85fe067a3bb2d96a
+        run: |
+          git clone https://github.com/t-crest/patmos-benchmarks
+          cd patmos-benchmarks
+          git checkout "$BENCH_COMMIT"
+
+      - name: Configure and build benchmarks
+        working-directory: llvm-project
+        run: |
+          mkdir -p build-bench
+          cmake -S patmos-benchmarks -B build-bench \
+            -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/llvm-project/patmos-benchmarks/cmake/patmos-clang-toolchain.cmake \
+            -DENABLE_TESTING=true
+          cmake --build build-bench -- -j"$NIX_BUILD_CORES"
+
+      - name: Run benchmark tests
+        working-directory: llvm-project/build-bench
+        run: ctest --output-on-failure -j"$NIX_BUILD_CORES"
+
+  package:
+    name: Package
+    needs: [test-clang, test-lld, build-compiler-rt]
+    runs-on: namespace-profile-beta-cicd
+    timeout-minutes: 60
+
+    steps:
+      - name: Download LLVM toolchain payload
+        uses: actions/download-artifact@v4
+        with:
+          name: llvm-toolchain-payload
+          path: artifacts
+
+      - name: Download Compiler-RT build
+        uses: actions/download-artifact@v4
+        with:
+          name: compiler-rt-build
+          path: artifacts/compiler-rt-build
+
+      - name: Download Newlib sysroot
+        uses: actions/download-artifact@v4
+        with:
+          name: newlib-sysroot
+          path: artifacts/newlib-sysroot
+
+      - name: Package
+        run: |
+          mkdir -p out/toolchain
+          tar -xzf artifacts/llvm-toolchain-payload.tar.gz -C out/toolchain
+          cp -a artifacts/newlib-sysroot out/toolchain/newlib-sysroot
+          cp -a artifacts/compiler-rt-build out/toolchain/compiler-rt-build
+          tar -czf llvm-patmos-toolchain.tar.gz -C out toolchain
+
+      - name: Upload final package
+        uses: actions/upload-artifact@v4
+        with:
+          name: llvm-patmos-toolchain
+          path: llvm-patmos-toolchain.tar.gz
+          retention-days: 7

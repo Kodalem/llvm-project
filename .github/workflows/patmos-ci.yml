@@ -1,15 +1,5 @@
 name: Patmos CI
 
-on:
-  push: 
-    branches: '**'
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+-**'
-  pull_request:
-  schedule:
-    # Run every monday at 1:00 AM
-    - cron: '00 1 * * MON'
 
 env:
   CARGO_TERM_COLOR: always
