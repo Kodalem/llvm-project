@@ -59,7 +59,11 @@ jobs:
         
           # Preserve executable mode if extraction dropped it on this runner.
           chmod +x "$PASIM_PATH"
-          "$PASIM_PATH" --help >/dev/null
+          PASIM_HELP="$("$PASIM_PATH" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *) echo "pasim smoke check failed"; echo "$PASIM_HELP"; exit 1 ;;
+          esac
 
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
@@ -75,7 +79,11 @@ jobs:
         run: |
           echo "PATMOS_PASIM=$PATMOS_PASIM"
           test -x "$PATMOS_PASIM"
-          "$PATMOS_PASIM" --help >/dev/null
+          PASIM_HELP="$("$PATMOS_PASIM" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *) echo "pasim smoke check failed"; echo "$PASIM_HELP"; exit 1 ;;
+          esac
 
       - name: Configure Namespace cache volume
         uses: namespacelabs/nscloud-cache-action@v1
@@ -130,7 +138,11 @@ jobs:
           PASIM: ${{ env.PASIM }}
         run: |
           echo "PATMOS_PASIM=$PATMOS_PASIM"
-          "$PATMOS_PASIM" --help >/dev/null
+          PASIM_HELP="$("$PATMOS_PASIM" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *) echo "pasim smoke check failed"; echo "$PASIM_HELP"; exit 1 ;;
+          esac
           ./build/bin/llvm-lit ./llvm/test -v --filter=Patmos
 
       - name: Package toolchain payload (small artifact for downstream jobs)
@@ -273,7 +285,11 @@ jobs:
             exit 1
           fi
           chmod +x "$PASIM_PATH"
-          "$PASIM_PATH" --help >/dev/null
+          PASIM_HELP="$("$PASIM_PATH" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *) echo "pasim smoke check failed"; echo "$PASIM_HELP"; exit 1 ;;
+          esac
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
@@ -302,7 +318,11 @@ jobs:
           PASIM: ${{ env.PASIM }}
         run: |
           echo "PATMOS_PASIM=$PATMOS_PASIM"
-          "$PATMOS_PASIM" --help >/dev/null
+          PASIM_HELP="$("$PATMOS_PASIM" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *) echo "pasim smoke check failed"; echo "$PASIM_HELP"; exit 1 ;;
+          esac
           ./build/bin/llvm-lit ./clang/test -v --filter=Patmos
 
   test-lld:
@@ -343,7 +363,11 @@ jobs:
             exit 1
           fi
           chmod +x "$PASIM_PATH"
-          "$PASIM_PATH" --help >/dev/null
+          PASIM_HELP="$("$PASIM_PATH" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *) echo "pasim smoke check failed"; echo "$PASIM_HELP"; exit 1 ;;
+          esac
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
@@ -357,7 +381,11 @@ jobs:
           PASIM: ${{ env.PASIM }}
         run: |
           echo "PATMOS_PASIM=$PATMOS_PASIM"
-          "$PATMOS_PASIM" --help >/dev/null
+          PASIM_HELP="$("$PATMOS_PASIM" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *) echo "pasim smoke check failed"; echo "$PASIM_HELP"; exit 1 ;;
+          esac
           ./build/bin/llvm-lit ./lld/test -v --filter=Patmos
 
   build-compiler-rt:
@@ -403,7 +431,11 @@ jobs:
             exit 1
           fi
           chmod +x "$PASIM_PATH"
-          "$PASIM_PATH" --help >/dev/null
+          PASIM_HELP="$("$PASIM_PATH" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *) echo "pasim smoke check failed"; echo "$PASIM_HELP"; exit 1 ;;
+          esac
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
@@ -446,7 +478,11 @@ jobs:
           PASIM: ${{ env.PASIM }}
         run: |
           echo "PATMOS_PASIM=$PATMOS_PASIM"
-          "$PATMOS_PASIM" --help >/dev/null
+          PASIM_HELP="$("$PATMOS_PASIM" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *) echo "pasim smoke check failed"; echo "$PASIM_HELP"; exit 1 ;;
+          esac
           ./build/bin/llvm-lit -v ./build-compiler-rt/test/builtins/Unit/patmos
 
       - name: Upload Compiler-RT build artifact
