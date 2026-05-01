@@ -50,29 +50,22 @@ jobs:
             https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
           tar -xvf build/local/patmos-simulator.tar.gz -C build/local
         
-          # Find simulator binary across naming/layout variations
-          PASIM_PATH=""
-          for cand in \
-            "$(pwd)/build/local/bin/pasim" \
-            "$(find "$(pwd)/build/local" -maxdepth 5 -type f -name pasim | head -n1)"; do
-            if [ -n "${cand:-}" ] && [ -x "$cand" ]; then
-              PASIM_PATH="$cand"
-              break
-            fi
-          done
-        
-          if [ -z "$PASIM_PATH" ]; then
+          PASIM_PATH="$(find "$(pwd)/build/local" -maxdepth 6 -type f -name pasim | head -n1 || true)"
+          if [ -z "${PASIM_PATH:-}" ]; then
             echo "Could not find simulator executable (pasim) under $(pwd)/build/local"
-            find "$(pwd)/build/local" -maxdepth 5 -type f | sort
+            find "$(pwd)/build/local" -maxdepth 6 -type f | sort
             exit 1
           fi
         
+          # Preserve executable mode if extraction dropped it on this runner.
+          chmod +x "$PASIM_PATH"
+          "$PASIM_PATH" --help >/dev/null
+
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           PATH="$PASIM_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
-          "$PASIM_PATH" --help >/dev/null
 
       - name: Smoke Check pasim (fail fast)
         working-directory: llvm-project
@@ -269,21 +262,23 @@ jobs:
       - name: Install Patmos simulator tools (pasim)
         working-directory: llvm-project
         run: |
+          set -euo pipefail
           mkdir -p build/local
           wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
           tar -xvf build/local/patmos-simulator.tar.gz -C build/local
-          PASIM_PATH="$(pwd)/build/local/bin/pasim"
-          if [ ! -x "$PASIM_PATH" ]; then
-            echo "Could not find executable pasim at $PASIM_PATH"
-            find "$(pwd)/build/local" -maxdepth 4 -type f | sort
+          PASIM_PATH="$(find "$(pwd)/build/local" -maxdepth 6 -type f -name pasim | head -n1 || true)"
+          if [ -z "${PASIM_PATH:-}" ]; then
+            echo "Could not find simulator executable (pasim) under $(pwd)/build/local"
+            find "$(pwd)/build/local" -maxdepth 6 -type f | sort
             exit 1
           fi
+          chmod +x "$PASIM_PATH"
+          "$PASIM_PATH" --help >/dev/null
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
-          PATH="$PASIM_DIR:$PATH" command -v pasim
-          "$PASIM_PATH" --help >/dev/null
+          PATH="$PASIM_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
 
       - name: Export toolchain and sysroot paths
         working-directory: llvm-project
@@ -337,21 +332,23 @@ jobs:
       - name: Install Patmos simulator tools (pasim)
         working-directory: llvm-project
         run: |
+          set -euo pipefail
           mkdir -p build/local
           wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
           tar -xvf build/local/patmos-simulator.tar.gz -C build/local
-          PASIM_PATH="$(pwd)/build/local/bin/pasim"
-          if [ ! -x "$PASIM_PATH" ]; then
-            echo "Could not find executable pasim at $PASIM_PATH"
-            find "$(pwd)/build/local" -maxdepth 4 -type f | sort
+          PASIM_PATH="$(find "$(pwd)/build/local" -maxdepth 6 -type f -name pasim | head -n1 || true)"
+          if [ -z "${PASIM_PATH:-}" ]; then
+            echo "Could not find simulator executable (pasim) under $(pwd)/build/local"
+            find "$(pwd)/build/local" -maxdepth 6 -type f | sort
             exit 1
           fi
+          chmod +x "$PASIM_PATH"
+          "$PASIM_PATH" --help >/dev/null
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
-          PATH="$PASIM_DIR:$PATH" command -v pasim
-          "$PASIM_PATH" --help >/dev/null
+          PATH="$PASIM_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
 
       - name: Test LLD (Patmos-filtered)
         working-directory: llvm-project
@@ -395,21 +392,23 @@ jobs:
       - name: Install Patmos simulator tools (pasim)
         working-directory: llvm-project
         run: |
+          set -euo pipefail
           mkdir -p build/local
           wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
           tar -xvf build/local/patmos-simulator.tar.gz -C build/local
-          PASIM_PATH="$(pwd)/build/local/bin/pasim"
-          if [ ! -x "$PASIM_PATH" ]; then
-            echo "Could not find executable pasim at $PASIM_PATH"
-            find "$(pwd)/build/local" -maxdepth 4 -type f | sort
+          PASIM_PATH="$(find "$(pwd)/build/local" -maxdepth 6 -type f -name pasim | head -n1 || true)"
+          if [ -z "${PASIM_PATH:-}" ]; then
+            echo "Could not find simulator executable (pasim) under $(pwd)/build/local"
+            find "$(pwd)/build/local" -maxdepth 6 -type f | sort
             exit 1
           fi
+          chmod +x "$PASIM_PATH"
+          "$PASIM_PATH" --help >/dev/null
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
-          PATH="$PASIM_DIR:$PATH" command -v pasim
-          "$PASIM_PATH" --help >/dev/null
+          PATH="$PASIM_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
 
       - name: Cache Compiler-RT build directory
         uses: namespacelabs/nscloud-cache-action@v1
