@@ -1,7 +1,11 @@
 set(CMAKE_SYSTEM_NAME Generic)
 
-set(CMAKE_C_COMPILER   clang)
-set(CMAKE_CXX_COMPILER   clang++)
+if(NOT CMAKE_C_COMPILER)
+  set(CMAKE_C_COMPILER   clang)
+endif()
+if(NOT CMAKE_CXX_COMPILER)
+  set(CMAKE_CXX_COMPILER   clang++)
+endif()
 set(CMAKE_C_FLAGS "-c")
 set(CMAKE_CXX_FLAGS "-c")
 set(CMAKE_C_COMPILER_TARGET "patmos")
