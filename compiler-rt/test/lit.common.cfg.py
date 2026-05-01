@@ -308,11 +308,12 @@ for name in possibly_dangerous_env_vars:
 
 # Tweak PATH to include llvm tools dir.
 if (not config.llvm_tools_dir) or (not os.path.exists(config.llvm_tools_dir)):
-    lit_config.fatal(
-        "Invalid llvm_tools_dir config attribute: %r" % config.llvm_tools_dir
+    lit_config.warning(
+        "Invalid llvm_tools_dir config attribute: %r. Skipping PATH tweak." % config.llvm_tools_dir
     )
-path = os.path.pathsep.join((config.llvm_tools_dir, config.environment["PATH"]))
-config.environment["PATH"] = path
+else:
+    path = os.path.pathsep.join((config.llvm_tools_dir, config.environment["PATH"]))
+    config.environment["PATH"] = path
 
 # Help MSVS link.exe find the standard libraries.
 # Make sure we only try to use it when targetting Windows.

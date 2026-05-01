@@ -83,7 +83,7 @@ If you need to build the standard library (newlib):
 git clone https://github.com/t-crest/patmos-newlib
 mkdir build-newlib
 cd build-newlib
-../patmos-newlib/configure --target=patmos-unknown-unknown-elf AR_FOR_TARGET=ar CC_FOR_TARGET="$(pwd)/../build/bin/clang" CFLAGS_FOR_TARGET="-target patmos-unknown-unknown-elf -O2 -emit-llvm -Wno-error -Wno-error=deprecated-non-prototype -Wno-error=invalid-noreturn -D__GLIBC_USE\(...\)=0 -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types" RANLIB_FOR_TARGET=ranlib LD_FOR_TARGET="$(pwd)/../build/bin/clang" 
+../patmos-newlib/configure --target=patmos-unknown-unknown-elf AR_FOR_TARGET="$(pwd)/../build/bin/llvm-ar" CC_FOR_TARGET="$(pwd)/../build/bin/clang" CFLAGS_FOR_TARGET="-target patmos-unknown-unknown-elf -O2 -emit-llvm -Wno-error -Wno-error=deprecated-non-prototype -Wno-error=invalid-noreturn -D__GLIBC_USE\(...\)=0 -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types" RANLIB_FOR_TARGET="$(pwd)/../build/bin/llvm-ranlib" LD_FOR_TARGET="$(pwd)/../build/bin/clang"
 make
 ```
 This compiles std into bitcode files, such that they are ready to publish with the compiler.
@@ -279,8 +279,29 @@ How to compile the stuff later:
 ./build/bin/clang++ --target=patmos-unknown-unknown-elf -O2 -c ./fibonacci-test.cpp -o ./fibonacci-test.o
 
 # 1) This is how to object dump the code
-./build/bin/llvm-objdump -d ./fibonacci-test.o 
+./build/bin/llvm-objdump -d ./fibonacci-test.o
 
+# 2) This is how you generate the .pml file for Platin
+### NOTE: THIS IS IMPORTANT TO USE -mserialize-pml, AND NOT -mserialize
+./build/bin/clang++ --target=patmos-unknown-unknown-elf -O2 -mserialize-pml=fibonacci.pml -c ./fibonacci-test.cpp -o fibonacci.out
+
+# 3) This is how use you Platin (assuming you Git clone'd it and compiled it in Ruby)
+./.platin-inst/bin/platin wcet -i fibonacci.pml -b fibonacci.out -e main --report --disable-ait --objdump-command ./build/bin/llvm-objdump
+
+```
+
+## Platin annoyances aka. setup
+
+Annoying about lp_solve?
+
+```zsh
+brew tap brewsci/science
+brew install lp_solve
+```
+
+How to even install the bloody thing?
+```zsh
+./patmos-platin/install.sh -i ./platin-inst
 ```
 
 ## Extra flags

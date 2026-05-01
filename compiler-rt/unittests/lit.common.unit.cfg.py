@@ -31,9 +31,10 @@ config.suffixes = []
 # Tweak PATH to include llvm tools dir.
 llvm_tools_dir = config.llvm_tools_dir
 if (not llvm_tools_dir) or (not os.path.exists(llvm_tools_dir)):
-    lit_config.fatal("Invalid llvm_tools_dir config attribute: %r" % llvm_tools_dir)
-path = os.path.pathsep.join((llvm_tools_dir, config.environment["PATH"]))
-config.environment["PATH"] = path
+    lit_config.warning("Invalid llvm_tools_dir config attribute: %r. Skipping PATH tweak." % llvm_tools_dir)
+else:
+    path = os.path.pathsep.join((llvm_tools_dir, config.environment["PATH"]))
+    config.environment["PATH"] = path
 
 # Propagate the temp directory. Windows requires this because it uses \Windows\
 # if none of these are present.
