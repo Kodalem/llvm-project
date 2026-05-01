@@ -255,7 +255,7 @@ runs:
       working-directory: ${{env.NEWLIB_BUILD_PATH}}
       shell: bash
       run: |
-        $GITHUB_WORKSPACE/$NEWLIB_PATH/configure --target=patmos-unknown-unknown-elf AR_FOR_TARGET=ar CC_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/clang" CFLAGS_FOR_TARGET="-target patmos-unknown-unknown-elf -O2 -emit-llvm -D__GLIBC_USE\(...\)=0 -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types" RANLIB_FOR_TARGET=ranlib LD_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/clang"
+        $GITHUB_WORKSPACE/$NEWLIB_PATH/configure --target=patmos-unknown-unknown-elf AR_FOR_TARGET=ar CC_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/clang" CFLAGS_FOR_TARGET="-target patmos-unknown-unknown-elf -O2 -emit-llvm -Wno-error -Wno-error=deprecated-non-prototype -Wno-error=invalid-noreturn -D__GLIBC_USE\(...\)=0 -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types" RANLIB_FOR_TARGET=ranlib LD_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/clang"
         make
 
     - name: Run Clang Unit Tests
