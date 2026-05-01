@@ -54,7 +54,7 @@ jobs:
           PASIM_PATH=""
           for cand in \
             "$(pwd)/build/local/bin/pasim" \
-            "$(find "$(pwd)/build/local" -maxdepth 5 -type f \( -name pasim -o \) | head -n1)"; do
+            "$(find "$(pwd)/build/local" -maxdepth 5 -type f -name pasim | head -n1)"; do
             if [ -n "${cand:-}" ] && [ -x "$cand" ]; then
               PASIM_PATH="$cand"
               break
@@ -62,7 +62,7 @@ jobs:
           done
         
           if [ -z "$PASIM_PATH" ]; then
-            echo "Could not find simulator executable (pasim/paasm) under $(pwd)/build/local"
+            echo "Could not find simulator executable (pasim) under $(pwd)/build/local"
             find "$(pwd)/build/local" -maxdepth 5 -type f | sort
             exit 1
           fi
