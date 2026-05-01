@@ -11,7 +11,8 @@ on:
       - patmos-llvm-22x-rusty*
       
 env:
-  NIX_BUILD_CORES: 2
+  NIX_BUILD_CORES: 8
+  CI_MAX_PARALLEL: 5
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   CCACHE_BASEDIR: ${{ github.workspace }}
   CCACHE_COMPILERCHECK: content
@@ -38,7 +39,15 @@ jobs:
       - name: Ensure build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build ccache
+          sudo apt-get install -y ninja-build ccache wget
+
+      - name: Install Patmos simulator tools (pasim)
+        working-directory: llvm-project
+        run: |
+          mkdir -p build/local
+          wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
+          tar -xvf build/local/patmos-simulator.tar.gz -C build/local
+          echo "$GITHUB_WORKSPACE/llvm-project/build/local/bin" >> "$GITHUB_PATH"
 
       - name: Configure Namespace cache volume
         uses: namespacelabs/nscloud-cache-action@v1
@@ -84,7 +93,7 @@ jobs:
 
       - name: Build LLVM
         working-directory: llvm-project
-        run: cmake --build build -- -j"$NIX_BUILD_CORES"
+        run: cmake --build build -- -j"$CI_MAX_PARALLEL"
 
       - name: Test LLVM (Patmos-filtered)
         working-directory: llvm-project
@@ -170,7 +179,7 @@ jobs:
             CFLAGS_FOR_TARGET="-target patmos-unknown-unknown-elf -O2 -emit-llvm -Wno-error -Wno-error=deprecated-non-prototype -Wno-error=invalid-noreturn -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types" \
             RANLIB_FOR_TARGET="$(pwd)/../build/bin/llvm-ranlib" \
             LD_FOR_TARGET="$(pwd)/../build/bin/clang"
-          make -j"$NIX_BUILD_CORES"
+          make -j"$CI_MAX_PARALLEL"
 
       - name: Install Newlib sysroot
         working-directory: llvm-project
@@ -216,6 +225,14 @@ jobs:
           name: newlib-sysroot
           path: llvm-project/out/newlib-sysroot
 
+      - name: Install Patmos simulator tools (pasim)
+        working-directory: llvm-project
+        run: |
+          mkdir -p build/local
+          wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
+          tar -xvf build/local/patmos-simulator.tar.gz -C build/local
+          echo "$GITHUB_WORKSPACE/llvm-project/build/local/bin" >> "$GITHUB_PATH"
+
       - name: Export toolchain and sysroot paths
         working-directory: llvm-project
         run: |
@@ -223,6 +240,10 @@ jobs:
           echo "PATMOS_NEWLIB_SYSROOT=${GITHUB_WORKSPACE}/llvm-project/out/newlib-sysroot" >> "$GITHUB_ENV"
           echo "PATMOS_NEWLIB_LIB=${GITHUB_WORKSPACE}/llvm-project/out/newlib-sysroot/usr/lib" >> "$GITHUB_ENV"
           echo "PATMOS_NEWLIB_INCLUDE=${GITHUB_WORKSPACE}/llvm-project/out/newlib-sysroot/usr/include" >> "$GITHUB_ENV"
+
+      - name: Build ClangPatmosTestDeps
+        working-directory: llvm-project
+        run: cmake --build build --target ClangPatmosTestDeps -- -j"$CI_MAX_PARALLEL"
 
       - name: Test Clang (Patmos-filtered, with Newlib sysroot)
         working-directory: llvm-project
@@ -256,6 +277,14 @@ jobs:
           mkdir -p build
           tar -xzf llvm-toolchain-payload.tar.gz -C build
 
+      - name: Install Patmos simulator tools (pasim)
+        working-directory: llvm-project
+        run: |
+          mkdir -p build/local
+          wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
+          tar -xvf build/local/patmos-simulator.tar.gz -C build/local
+          echo "$GITHUB_WORKSPACE/llvm-project/build/local/bin" >> "$GITHUB_PATH"
+
       - name: Test LLD (Patmos-filtered)
         working-directory: llvm-project
         run: ./build/bin/llvm-lit ./lld/test -v --filter=Patmos
@@ -275,7 +304,7 @@ jobs:
       - name: Ensure build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build ccache
+          sudo apt-get install -y ninja-build ccache wget
 
       - name: Download LLVM toolchain payload
         uses: actions/download-artifact@v4
@@ -288,6 +317,14 @@ jobs:
         run: |
           mkdir -p build
           tar -xzf llvm-toolchain-payload.tar.gz -C build
+
+      - name: Install Patmos simulator tools (pasim)
+        working-directory: llvm-project
+        run: |
+          mkdir -p build/local
+          wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
+          tar -xvf build/local/patmos-simulator.tar.gz -C build/local
+          echo "$GITHUB_WORKSPACE/llvm-project/build/local/bin" >> "$GITHUB_PATH"
 
       - name: Cache Compiler-RT build directory
         uses: namespacelabs/nscloud-cache-action@v1
@@ -316,7 +353,7 @@ jobs:
         working-directory: llvm-project
         run: |
           cd build-compiler-rt
-          ninja -j"$NIX_BUILD_CORES"
+          ninja -j"$CI_MAX_PARALLEL"
 
       - name: Test Compiler-RT
         working-directory: llvm-project
@@ -390,11 +427,11 @@ jobs:
           cmake -S patmos-benchmarks -B build-bench \
             -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/llvm-project/patmos-benchmarks/cmake/patmos-clang-toolchain.cmake \
             -DENABLE_TESTING=true
-          cmake --build build-bench -- -j"$NIX_BUILD_CORES"
+          cmake --build build-bench -- -j"$CI_MAX_PARALLEL"
 
       - name: Run benchmark tests
         working-directory: llvm-project/build-bench
-        run: ctest --output-on-failure -j"$NIX_BUILD_CORES"
+        run: ctest --output-on-failure -j"$CI_MAX_PARALLEL"
 
   package:
     name: Package
