@@ -47,15 +47,28 @@ jobs:
           mkdir -p build/local
           wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
           tar -xvf build/local/patmos-simulator.tar.gz -C build/local
-          PASIM_PATH="$(find "$(pwd)/build/local" -type f -name pasim | head -n 1)"
-          if [ -z "$PASIM_PATH" ]; then
-            echo "Could not find pasim after extraction"
+          PASIM_PATH="$(pwd)/build/local/bin/pasim"
+          if [ ! -x "$PASIM_PATH" ]; then
+            echo "Could not find executable pasim at $PASIM_PATH"
             find "$(pwd)/build/local" -maxdepth 4 -type f | sort
             exit 1
           fi
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
+          echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
+          echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           PATH="$PASIM_DIR:$PATH" command -v pasim
+          "$PASIM_PATH" --help >/dev/null
+
+      - name: Smoke Check pasim (fail fast)
+        working-directory: llvm-project
+        env:
+          PATMOS_PASIM: ${{ env.PATMOS_PASIM }}
+          PASIM: ${{ env.PASIM }}
+        run: |
+          echo "PATMOS_PASIM=$PATMOS_PASIM"
+          test -x "$PATMOS_PASIM"
+          "$PATMOS_PASIM" --help >/dev/null
 
       - name: Configure Namespace cache volume
         uses: namespacelabs/nscloud-cache-action@v1
@@ -105,7 +118,13 @@ jobs:
 
       - name: Test LLVM (Patmos-filtered)
         working-directory: llvm-project
-        run: ./build/bin/llvm-lit ./llvm/test -v --filter=Patmos
+        env:
+          PATMOS_PASIM: ${{ env.PATMOS_PASIM }}
+          PASIM: ${{ env.PASIM }}
+        run: |
+          echo "PATMOS_PASIM=$PATMOS_PASIM"
+          "$PATMOS_PASIM" --help >/dev/null
+          ./build/bin/llvm-lit ./llvm/test -v --filter=Patmos
 
       - name: Package toolchain payload (small artifact for downstream jobs)
         working-directory: llvm-project
@@ -239,15 +258,18 @@ jobs:
           mkdir -p build/local
           wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
           tar -xvf build/local/patmos-simulator.tar.gz -C build/local
-          PASIM_PATH="$(find "$(pwd)/build/local" -type f -name pasim | head -n 1)"
-          if [ -z "$PASIM_PATH" ]; then
-            echo "Could not find pasim after extraction"
+          PASIM_PATH="$(pwd)/build/local/bin/pasim"
+          if [ ! -x "$PASIM_PATH" ]; then
+            echo "Could not find executable pasim at $PASIM_PATH"
             find "$(pwd)/build/local" -maxdepth 4 -type f | sort
             exit 1
           fi
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
+          echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
+          echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           PATH="$PASIM_DIR:$PATH" command -v pasim
+          "$PASIM_PATH" --help >/dev/null
 
       - name: Export toolchain and sysroot paths
         working-directory: llvm-project
@@ -267,7 +289,12 @@ jobs:
           PATMOS_NEWLIB_SYSROOT: ${{ env.PATMOS_NEWLIB_SYSROOT }}
           PATMOS_NEWLIB_LIB: ${{ env.PATMOS_NEWLIB_LIB }}
           PATMOS_NEWLIB_INCLUDE: ${{ env.PATMOS_NEWLIB_INCLUDE }}
-        run: ./build/bin/llvm-lit ./clang/test -v --filter=Patmos
+          PATMOS_PASIM: ${{ env.PATMOS_PASIM }}
+          PASIM: ${{ env.PASIM }}
+        run: |
+          echo "PATMOS_PASIM=$PATMOS_PASIM"
+          "$PATMOS_PASIM" --help >/dev/null
+          ./build/bin/llvm-lit ./clang/test -v --filter=Patmos
 
   test-lld:
     name: Test LLD
@@ -299,19 +326,28 @@ jobs:
           mkdir -p build/local
           wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
           tar -xvf build/local/patmos-simulator.tar.gz -C build/local
-          PASIM_PATH="$(find "$(pwd)/build/local" -type f -name pasim | head -n 1)"
-          if [ -z "$PASIM_PATH" ]; then
-            echo "Could not find pasim after extraction"
+          PASIM_PATH="$(pwd)/build/local/bin/pasim"
+          if [ ! -x "$PASIM_PATH" ]; then
+            echo "Could not find executable pasim at $PASIM_PATH"
             find "$(pwd)/build/local" -maxdepth 4 -type f | sort
             exit 1
           fi
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
+          echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
+          echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           PATH="$PASIM_DIR:$PATH" command -v pasim
+          "$PASIM_PATH" --help >/dev/null
 
       - name: Test LLD (Patmos-filtered)
         working-directory: llvm-project
-        run: ./build/bin/llvm-lit ./lld/test -v --filter=Patmos
+        env:
+          PATMOS_PASIM: ${{ env.PATMOS_PASIM }}
+          PASIM: ${{ env.PASIM }}
+        run: |
+          echo "PATMOS_PASIM=$PATMOS_PASIM"
+          "$PATMOS_PASIM" --help >/dev/null
+          ./build/bin/llvm-lit ./lld/test -v --filter=Patmos
 
   build-compiler-rt:
     name: Build Compiler-RT
@@ -348,15 +384,18 @@ jobs:
           mkdir -p build/local
           wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
           tar -xvf build/local/patmos-simulator.tar.gz -C build/local
-          PASIM_PATH="$(find "$(pwd)/build/local" -type f -name pasim | head -n 1)"
-          if [ -z "$PASIM_PATH" ]; then
-            echo "Could not find pasim after extraction"
+          PASIM_PATH="$(pwd)/build/local/bin/pasim"
+          if [ ! -x "$PASIM_PATH" ]; then
+            echo "Could not find executable pasim at $PASIM_PATH"
             find "$(pwd)/build/local" -maxdepth 4 -type f | sort
             exit 1
           fi
           PASIM_DIR="$(dirname "$PASIM_PATH")"
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
+          echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
+          echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           PATH="$PASIM_DIR:$PATH" command -v pasim
+          "$PASIM_PATH" --help >/dev/null
 
       - name: Cache Compiler-RT build directory
         uses: namespacelabs/nscloud-cache-action@v1
@@ -389,7 +428,12 @@ jobs:
 
       - name: Test Compiler-RT
         working-directory: llvm-project
+        env:
+          PATMOS_PASIM: ${{ env.PATMOS_PASIM }}
+          PASIM: ${{ env.PASIM }}
         run: |
+          echo "PATMOS_PASIM=$PATMOS_PASIM"
+          "$PATMOS_PASIM" --help >/dev/null
           ./build/bin/llvm-lit -v ./build-compiler-rt/test/builtins/Unit/patmos
 
       - name: Upload Compiler-RT build artifact
