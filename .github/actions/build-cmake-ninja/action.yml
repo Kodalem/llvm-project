@@ -260,6 +260,29 @@ runs:
         $GITHUB_WORKSPACE/$NEWLIB_PATH/configure --target=patmos-unknown-unknown-elf AR_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/llvm-ar" CC_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/clang" CFLAGS_FOR_TARGET="-target patmos-unknown-unknown-elf -O2 -emit-llvm -Wno-error -Wno-error=deprecated-non-prototype -Wno-error=invalid-noreturn -D__GLIBC_USE\(...\)=0 -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types" RANLIB_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/llvm-ranlib" LD_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/clang"
         make
 
+    - name: Build Patmos Clang Driver Test Dependencies
+      if: (inputs.enable-tests == 'true') && startsWith(inputs.default-target, 'patmos')
+      shell: bash
+      working-directory: ${{env.BUILD_PATH}}
+      env:
+        PARALLELISM: ${{ inputs.parallelism }}
+      run: |
+        ninja -j $PARALLELISM clang-test-depends
+
+    - name: Verify Patmos Mock Runtime Artifacts
+      if: (inputs.enable-tests == 'true') && startsWith(inputs.default-target, 'patmos')
+      shell: bash
+      run: |
+        PATMOS_LIB_DIR="$GITHUB_WORKSPACE/$BUILD_PATH/patmos-unknown-unknown-elf/lib"
+        ls -l "$PATMOS_LIB_DIR"
+
+        for f in crt0.o crtbegin.o crtend.o libc.a libm.a libpatmos.a libsyms.o librt.a; do
+          test -f "$PATMOS_LIB_DIR/$f" || {
+            echo "Missing Patmos test runtime artifact: $PATMOS_LIB_DIR/$f"
+            exit 1
+          }
+        done
+
     - name: Run Clang Unit Tests
       if: inputs.enable-tests == 'true'
       uses: ./.github/actions/build-test-cmake
