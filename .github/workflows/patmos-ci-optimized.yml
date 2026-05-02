@@ -131,25 +131,6 @@ jobs:
         working-directory: llvm-project
         run: cmake --build build -- -j"$CI_MAX_PARALLEL"
 
-      - name: Test LLVM (Patmos-filtered)
-        working-directory: llvm-project
-        env:
-          PATMOS_PASIM: ${{ env.PATMOS_PASIM }}
-          PASIM: ${{ env.PASIM }}
-        run: |
-          set -euo pipefail
-          echo "PATMOS_PASIM from env: $PATMOS_PASIM"
-          chmod +x "$PASIM_PATH"
-          export PATMOS_PASIM="$PASIM_PATH"
-          export PASIM="$PASIM_PATH"
-          echo "PATMOS_PASIM=$PATMOS_PASIM"
-          PASIM_HELP="$("$PATMOS_PASIM" --help 2>&1 || true)"
-          case "$PASIM_HELP" in
-            *"Generic options:"*) ;;
-            *) echo "pasim smoke check failed"; echo "$PASIM_HELP"; exit 1 ;;
-          esac
-          ./build/bin/llvm-lit ./llvm/test -v --filter=Patmos
-
       - name: Package toolchain payload (small artifact for downstream jobs)
         working-directory: llvm-project
         run: |
@@ -181,6 +162,91 @@ jobs:
       - name: Show ccache stats (post-build)
         if: always()
         run: ccache -s || true
+
+  test-llvm:
+    name: Test LLVM
+    needs: build-llvm
+    runs-on: namespace-profile-beta-cicd
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout LLVM monorepo
+        uses: namespacelabs/nscloud-checkout-action@v8
+        with:
+          path: llvm-project
+
+      - name: Ensure build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ccache wget
+
+      - name: Download LLVM toolchain payload
+        uses: actions/download-artifact@v4
+        with:
+          name: llvm-toolchain-payload
+          path: llvm-project
+
+      - name: Unpack LLVM toolchain payload
+        working-directory: llvm-project
+        run: |
+          mkdir -p build
+          tar -xzf llvm-toolchain-payload.tar.gz -C build
+
+      - name: Install Patmos simulator tools (pasim)
+        working-directory: llvm-project
+        run: |
+          set -euo pipefail
+          mkdir -p build/local
+          wget -O build/local/patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
+          tar -xvf build/local/patmos-simulator.tar.gz -C build/local
+          PASIM_PATH="$(find "$(pwd)/build/local" -maxdepth 6 -type f -name pasim | head -n1 || true)"
+          if [ -z "${PASIM_PATH:-}" ]; then
+            echo "Could not find simulator executable (pasim) under $(pwd)/build/local"
+            find "$(pwd)/build/local" -maxdepth 6 -type f | sort
+            exit 1
+          fi
+          chmod +x "$PASIM_PATH"
+          PASIM_HELP="$("$PASIM_PATH" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *) echo "pasim smoke check failed"; echo "$PASIM_HELP"; exit 1 ;;
+          esac
+          PASIM_DIR="$(dirname "$PASIM_PATH")"
+          echo "$PASIM_DIR" >> "$GITHUB_PATH"
+          echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
+          echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
+          PATH="$PASIM_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
+
+      - name: Test LLVM (Patmos-filtered)
+        working-directory: llvm-project
+        env:
+          PATMOS_PASIM: ${{ env.PATMOS_PASIM }}
+          PASIM: ${{ env.PASIM }}
+        run: |
+          set -euo pipefail
+          PASIM_PATH="${PATMOS_PASIM:-${PASIM:-}}"
+          if [ -z "${PASIM_PATH:-}" ] || [ ! -f "$PASIM_PATH" ]; then
+            PASIM_PATH="$(find "$GITHUB_WORKSPACE/llvm-project/build/local" -maxdepth 12 -type f -name pasim 2>/dev/null | head -n1 || true)"
+          fi
+          if [ -z "${PASIM_PATH:-}" ] || [ ! -f "$PASIM_PATH" ]; then
+            PASIM_PATH="$(find "$GITHUB_WORKSPACE" -maxdepth 12 -type f -name pasim 2>/dev/null | head -n1 || true)"
+          fi
+          if [ -z "${PASIM_PATH:-}" ]; then
+            echo "Could not find pasim under workspace paths"
+            echo "PATMOS_PASIM from env: ${PATMOS_PASIM:-<unset>}"
+            find "$GITHUB_WORKSPACE" -maxdepth 10 -type f | sort | sed -n '1,300p'
+            exit 1
+          fi
+          chmod +x "$PASIM_PATH"
+          export PATMOS_PASIM="$PASIM_PATH"
+          export PASIM="$PASIM_PATH"
+          echo "PATMOS_PASIM=$PATMOS_PASIM"
+          PASIM_HELP="$("$PATMOS_PASIM" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *) echo "pasim smoke check failed"; echo "$PASIM_HELP"; exit 1 ;;
+          esac
+          ./build/bin/llvm-lit ./llvm/test -v --filter=Patmos
 
   build-newlib:
     name: Build Newlib
@@ -532,7 +598,7 @@ jobs:
 
   test-benchmarks:
     name: Test Benchmarks
-    needs: [test-clang, test-lld, build-compiler-rt]
+    needs: [test-llvm, test-clang, test-lld, build-compiler-rt]
     runs-on: namespace-profile-beta-cicd
     timeout-minutes: 120
 
@@ -598,7 +664,7 @@ jobs:
 
   package:
     name: Package
-    needs: [test-clang, test-lld, build-compiler-rt]
+    needs: [test-llvm, test-clang, test-lld, build-compiler-rt]
     runs-on: namespace-profile-beta-cicd
     timeout-minutes: 60
 
