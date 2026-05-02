@@ -159,6 +159,16 @@ ADD_CUSTOM_TARGET(symlink-clang-lld
 	)	
 STRING(REGEX REPLACE "${PACKAGE_TEMP_DIR}/" ";"  PACKAGE_ITEMS_IN_TAR ${PACKAGE_ITEMS})
 STRING(REGEX REPLACE "${PACKAGE_TEMP_DIR}/" ";"  PACKAGE_INFO_FILE_IN_TAR ${PACKAGE_INFO_FILE})
+
+# Check for git repo and set variables BEFORE the custom command
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+	execute_process(COMMAND git describe --tags --always OUTPUT_VARIABLE GIT_TAG OUTPUT_STRIP_TRAILING_WHITESPACE)
+	execute_process(COMMAND git rev-parse HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+else()
+	set(GIT_TAG "unknown")
+	set(GIT_COMMIT "unknown")
+endif()
+
 # Build release tarball containing binaries and metadata
 add_custom_command(
 	OUTPUT ${PACKAGE_TAR_GZ} 
@@ -168,24 +178,22 @@ add_custom_command(
 	# Package binaries
 	COMMAND tar -cf ${PACKAGE_TAR} -C ${PACKAGE_TEMP_DIR}/ ${PACKAGE_ITEMS_IN_TAR}
 
-	# Build YAML info file
-	COMMAND ${CMAKE_COMMAND} -E echo "name: ${PROJECT_NAME}" > ${PACKAGE_INFO_FILE}
-	COMMAND ${CMAKE_COMMAND} -E echo "target: ${TARGET_TRIPLE}" >> ${PACKAGE_INFO_FILE}
-	COMMAND ${CMAKE_COMMAND} -E echo_append "version: " >> ${PACKAGE_INFO_FILE}
-	COMMAND git describe --tags --always >> ${PACKAGE_INFO_FILE}
-	COMMAND ${CMAKE_COMMAND} -E echo_append "commit: " >> ${PACKAGE_INFO_FILE}
-	COMMAND git rev-parse HEAD >> ${PACKAGE_INFO_FILE}
-	COMMAND ${CMAKE_COMMAND} -E echo "files:\\| " >> ${PACKAGE_INFO_FILE}
-	COMMAND tar -tf ${PACKAGE_TAR} | sed "s/^/  /" >> ${PACKAGE_INFO_FILE}
-	
-	# Add the info file to the package
-	COMMAND tar -rf ${PACKAGE_TAR} -C ${PACKAGE_TEMP_DIR}/ ${PACKAGE_INFO_FILE_IN_TAR}
-	
-	# Compress the tar
-	COMMAND gzip -9 < ${PACKAGE_TAR} > ${PACKAGE_TAR_GZ}
-	
-	DEPENDS 
-		${PACKAGE_TARGETS} ${PACKAGE_ITEMS_LIBS} ${MOVED_BINARIES} symlink-clang-lld 
+		# Build YAML info file with pre-computed git vars
+		COMMAND ${CMAKE_COMMAND} -E echo "name: ${PROJECT_NAME}" > ${PACKAGE_INFO_FILE}
+		COMMAND ${CMAKE_COMMAND} -E echo "target: ${TARGET_TRIPLE}" >> ${PACKAGE_INFO_FILE}
+		COMMAND ${CMAKE_COMMAND} -E echo_append "version: ${GIT_TAG}" >> ${PACKAGE_INFO_FILE}
+		COMMAND ${CMAKE_COMMAND} -E echo_append "commit: ${GIT_COMMIT}" >> ${PACKAGE_INFO_FILE}
+		COMMAND ${CMAKE_COMMAND} -E echo "files:\\| " >> ${PACKAGE_INFO_FILE}
+		COMMAND tar -tf ${PACKAGE_TAR} | sed "s/^/  /" >> ${PACKAGE_INFO_FILE}
+
+		# Add the info file to the package
+		COMMAND tar -rf ${PACKAGE_TAR} -C ${PACKAGE_TEMP_DIR}/ ${PACKAGE_INFO_FILE_IN_TAR}
+
+		# Compress the tar
+		COMMAND gzip -9 < ${PACKAGE_TAR} > ${PACKAGE_TAR_GZ}
+
+		DEPENDS
+		${PACKAGE_TARGETS} ${PACKAGE_ITEMS_LIBS} ${MOVED_BINARIES} symlink-clang-lld
 		"${PACKAGE_TEMP_DIR}/lib/clang/${CLANG_RESOURCE_VERSION}/include/stdint.h"
 		"${PACKAGE_TEMP_DIR}/${PATMOS_TRIPLE}/include/newlib.h"
 )

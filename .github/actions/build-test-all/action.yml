@@ -213,7 +213,16 @@ runs:
       if: (inputs.enable-package == 'true') && (inputs.enable-tests == 'true')
       shell: bash
       run: tar -xvf $(find . -name 'patmos-llvm-*.tar.gz') -C $GITHUB_WORKSPACE/$INSTALL_PATH
-    # Download CET Test Suite
+
+    # Upload Package artifact
+    - name: Upload Package Artifact
+      if: inputs.enable-package == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{inputs.artifact-name}}
+        path: ${{env.BUILD_PATH}}/patmos-unknown-unknown-elf/package-temp/patmos-llvm-*.tar.gz
+
+    # Download CET Test Suite - THIS NEEDS TO BE INVESTIGATED AS THIS IS ANCIENT
     - name: Download CET test suite
       if: (inputs.enable-package == 'true') && (inputs.enable-tests == 'true')
       env:
@@ -230,10 +239,4 @@ runs:
       shell: bash
       run: |
         $GITHUB_WORKSPACE/$BUILD_PATH/bin/llvm-lit . -v --filter="^(?!((.*/dijkstra.c)|(.*/gsm_dec.c)|(.*/huff_dec.c)|(.*/st.c)|(.*/minver.c)|(.*/cosf.c))).*"
-    # Upload Package artifact
-    - name: Upload Package Artifact
-      if: inputs.enable-package == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{inputs.artifact-name}}
-        path: ${{env.BUILD_PATH}}/patmos-unknown-unknown-elf/package-temp/patmos-llvm-*.tar.gz
+
