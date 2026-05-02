@@ -42,11 +42,10 @@ jobs:
           wget -O patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
           tar -xvf patmos-simulator.tar.gz
   
-          # Use a known path instead of find
-          PASIM_PATH="$GITHUB_WORKSPACE/patmos-tools/patmos-simulator-x86_64-linux-gnu/pasim"
+          PASIM_PATH="$GITHUB_WORKSPACE/patmos-tools/bin/pasim"
           if [ ! -f "$PASIM_PATH" ]; then
             echo "::error::pasim not found at $PASIM_PATH"
-            ls -la "$GITHUB_WORKSPACE/patmos-tools" || true
+            ls -laR "$GITHUB_WORKSPACE/patmos-tools" || true
             exit 1
           fi
   
