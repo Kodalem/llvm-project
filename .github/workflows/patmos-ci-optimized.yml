@@ -73,7 +73,6 @@ jobs:
 
   build-llvm:
     name: Build LLVM
-    needs: setup-pasim
     runs-on: namespace-profile-beta-cicd
     timeout-minutes: 240
 
@@ -175,7 +174,7 @@ jobs:
 
   test-llvm:
     name: Test LLVM
-    needs: [build-llvm, setup-pasim]
+    needs: [build-llvm]
     runs-on: namespace-profile-beta-cicd
     timeout-minutes: 120
 
@@ -202,44 +201,48 @@ jobs:
           mkdir -p build
           tar -xzf llvm-toolchain-payload.tar.gz -C build
 
-      - name: Download Patmos simulator tools
-        uses: actions/download-artifact@v4
-        with:
-          name: patmos-simulator-tools
-          path: llvm-project
-
-      - name: Debug artifact after download
-        run: |
-          ls -laR "$(pwd)/llvm-project/patmos-tools"
-
-      - name: Setup pasim path
+      - name: Download and validate pasim
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use absolute paths to avoid working directory confusion
-          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
-          PASIM_DIR="$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          sudo apt-get update
+          sudo apt-get install -y wget tar
 
-          # Check file existence before chmod
+          mkdir -p "$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          cd "$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          wget -O patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
+          tar -xvf patmos-simulator.tar.gz
+
+          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
+          PASIM_BIN_DIR="$(dirname "$PASIM_PATH")"
+
           if [ ! -f "$PASIM_PATH" ]; then
             echo "::error::pasim not found at $PASIM_PATH"
-            ls -laR "$PASIM_DIR" || true
+            ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
             exit 1
           fi
           chmod +x "$PASIM_PATH"
 
-          # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$PASIM_DIR" || true
+            ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
             exit 1
           fi
 
-          # Add to PATH and environment
-          echo "$PASIM_DIR" >> "$GITHUB_PATH"
+          PASIM_HELP="$("$PASIM_PATH" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *)
+              echo "::error::pasim smoke check failed"
+              ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
+              exit 1
+              ;;
+          esac
+
+          echo "$PASIM_BIN_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
-          PATH="$PASIM_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
+          PATH="$PASIM_BIN_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
 
       - name: Verify workspace structure
         working-directory: llvm-project
@@ -347,7 +350,7 @@ jobs:
 
   test-clang:
     name: Test Clang
-    needs: [build-llvm, build-newlib, setup-pasim]
+    needs: [build-llvm, build-newlib]
     runs-on: namespace-profile-beta-cicd
     timeout-minutes: 120
 
@@ -375,44 +378,48 @@ jobs:
           name: newlib-sysroot
           path: llvm-project/out/newlib-sysroot
 
-      - name: Download Patmos simulator tools
-        uses: actions/download-artifact@v4
-        with:
-          name: patmos-simulator-tools
-          path: llvm-project
-
-      - name: Debug artifact after download
-        run: |
-          ls -laR "$(pwd)/llvm-project/patmos-tools"
-
-      - name: Setup pasim path
+      - name: Download and validate pasim
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use absolute paths to avoid working directory confusion
-          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
-          PASIM_DIR="$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          sudo apt-get update
+          sudo apt-get install -y wget tar
 
-          # Check file existence before chmod
+          mkdir -p "$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          cd "$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          wget -O patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
+          tar -xvf patmos-simulator.tar.gz
+
+          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
+          PASIM_BIN_DIR="$(dirname "$PASIM_PATH")"
+
           if [ ! -f "$PASIM_PATH" ]; then
             echo "::error::pasim not found at $PASIM_PATH"
-            ls -laR "$PASIM_DIR" || true
+            ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
             exit 1
           fi
           chmod +x "$PASIM_PATH"
 
-          # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$PASIM_DIR" || true
+            ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
             exit 1
           fi
 
-          # Add to PATH and environment
-          echo "$PASIM_DIR" >> "$GITHUB_PATH"
+          PASIM_HELP="$("$PASIM_PATH" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *)
+              echo "::error::pasim smoke check failed"
+              ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
+              exit 1
+              ;;
+          esac
+
+          echo "$PASIM_BIN_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
-          PATH="$PASIM_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
+          PATH="$PASIM_BIN_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
 
       - name: Export toolchain and sysroot paths
         working-directory: llvm-project
@@ -482,7 +489,7 @@ jobs:
 
   test-lld:
     name: Test LLD
-    needs: [build-llvm, setup-pasim]
+    needs: [build-llvm]
     runs-on: namespace-profile-beta-cicd
     timeout-minutes: 120
 
@@ -504,44 +511,48 @@ jobs:
           mkdir -p build
           tar -xzf llvm-toolchain-payload.tar.gz -C build
 
-      - name: Download Patmos simulator tools
-        uses: actions/download-artifact@v4
-        with:
-          name: patmos-simulator-tools
-          path: llvm-project
-
-      - name: Debug artifact after download
-        run: |
-          ls -laR "$(pwd)/llvm-project/patmos-tools"
-
-      - name: Setup pasim path
+      - name: Download and validate pasim
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use absolute paths to avoid working directory confusion
-          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
-          PASIM_DIR="$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          sudo apt-get update
+          sudo apt-get install -y wget tar
 
-          # Check file existence before chmod
+          mkdir -p "$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          cd "$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          wget -O patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
+          tar -xvf patmos-simulator.tar.gz
+
+          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
+          PASIM_BIN_DIR="$(dirname "$PASIM_PATH")"
+
           if [ ! -f "$PASIM_PATH" ]; then
             echo "::error::pasim not found at $PASIM_PATH"
-            ls -laR "$PASIM_DIR" || true
+            ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
             exit 1
           fi
           chmod +x "$PASIM_PATH"
 
-          # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$PASIM_DIR" || true
+            ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
             exit 1
           fi
 
-          # Add to PATH and environment
-          echo "$PASIM_DIR" >> "$GITHUB_PATH"
+          PASIM_HELP="$("$PASIM_PATH" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *)
+              echo "::error::pasim smoke check failed"
+              ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
+              exit 1
+              ;;
+          esac
+
+          echo "$PASIM_BIN_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
-          PATH="$PASIM_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
+          PATH="$PASIM_BIN_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
 
       - name: Verify workspace structure
         working-directory: llvm-project
@@ -596,7 +607,7 @@ jobs:
 
   build-compiler-rt:
     name: Build Compiler-RT
-    needs: [build-llvm, setup-pasim]
+    needs: [build-llvm]
     runs-on: namespace-profile-beta-cicd
     timeout-minutes: 180
 
@@ -623,44 +634,48 @@ jobs:
           mkdir -p build
           tar -xzf llvm-toolchain-payload.tar.gz -C build
 
-      - name: Download Patmos simulator tools
-        uses: actions/download-artifact@v4
-        with:
-          name: patmos-simulator-tools
-          path: llvm-project
-
-      - name: Debug artifact after download
-        run: |
-          ls -laR "$(pwd)/llvm-project/patmos-tools"
-
-      - name: Setup pasim path
+      - name: Download and validate pasim
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use absolute paths to avoid working directory confusion
-          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
-          PASIM_DIR="$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          sudo apt-get update
+          sudo apt-get install -y wget tar
 
-          # Check file existence before chmod
+          mkdir -p "$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          cd "$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          wget -O patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
+          tar -xvf patmos-simulator.tar.gz
+
+          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
+          PASIM_BIN_DIR="$(dirname "$PASIM_PATH")"
+
           if [ ! -f "$PASIM_PATH" ]; then
             echo "::error::pasim not found at $PASIM_PATH"
-            ls -laR "$PASIM_DIR" || true
+            ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
             exit 1
           fi
           chmod +x "$PASIM_PATH"
 
-          # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$PASIM_DIR" || true
+            ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
             exit 1
           fi
 
-          # Add to PATH and environment
-          echo "$PASIM_DIR" >> "$GITHUB_PATH"
+          PASIM_HELP="$("$PASIM_PATH" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *)
+              echo "::error::pasim smoke check failed"
+              ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
+              exit 1
+              ;;
+          esac
+
+          echo "$PASIM_BIN_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
-          PATH="$PASIM_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
+          PATH="$PASIM_BIN_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
 
       - name: Cache Compiler-RT build directory
         uses: namespacelabs/nscloud-cache-action@v1
@@ -799,6 +814,49 @@ jobs:
           git clone https://github.com/t-crest/patmos-benchmarks
           cd patmos-benchmarks
           git checkout "$BENCH_COMMIT"
+
+      - name: Download and validate pasim
+        working-directory: llvm-project
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y wget tar
+
+          mkdir -p "$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          cd "$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+          wget -O patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
+          tar -xvf patmos-simulator.tar.gz
+
+          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
+          PASIM_BIN_DIR="$(dirname "$PASIM_PATH")"
+
+          if [ ! -f "$PASIM_PATH" ]; then
+            echo "::error::pasim not found at $PASIM_PATH"
+            ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
+            exit 1
+          fi
+          chmod +x "$PASIM_PATH"
+
+          if [ ! -x "$PASIM_PATH" ]; then
+            echo "::error::pasim not found or not executable at $PASIM_PATH"
+            ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
+            exit 1
+          fi
+
+          PASIM_HELP="$("$PASIM_PATH" --help 2>&1 || true)"
+          case "$PASIM_HELP" in
+            *"Generic options:"*) ;;
+            *)
+              echo "::error::pasim smoke check failed"
+              ls -laR "$GITHUB_WORKSPACE/llvm-project/patmos-tools" || true
+              exit 1
+              ;;
+          esac
+
+          echo "$PASIM_BIN_DIR" >> "$GITHUB_PATH"
+          echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
+          echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
+          PATH="$PASIM_BIN_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
 
       - name: Configure and build benchmarks
         working-directory: llvm-project
