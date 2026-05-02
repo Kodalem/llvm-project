@@ -1,15 +1,6 @@
 name: LLVM Patmos CI - Optimized
 
-on:
-  push:
-    branches:
-      - main
-      - patmos-llvm-22x-rusty*
-  pull_request:
-    branches:
-      - main
-      - patmos-llvm-22x-rusty*
-      
+
 env:
   NIX_BUILD_CORES: 8
   CI_MAX_PARALLEL: 5
@@ -21,7 +12,7 @@ env:
 jobs:
   setup-pasim:
     name: Setup Patmos Simulator
-    runs-on: namespace-profile-beta-cicd
+    runs-on: macos-latest
     timeout-minutes: 30
     outputs:
       pasim_path: ${{ steps.set_pasim_path.outputs.path }}  # <-- Add output
@@ -30,8 +21,9 @@ jobs:
     steps:
       - name: Ensure tools for downloading simulator
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget tar
+          set -euo pipefail
+          brew update
+          brew install wget gnu-tar
 
       - name: Download and validate pasim
         id: set_pasim_path  # <-- Add ID for outputs
@@ -39,12 +31,13 @@ jobs:
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/patmos-tools"
           cd "$GITHUB_WORKSPACE/patmos-tools"
-          wget -O patmos-simulator.tar.gz https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz
-          tar -xvf patmos-simulator.tar.gz
-  
-          PASIM_PATH="$GITHUB_WORKSPACE/patmos-tools/bin/pasim"
-          if [ ! -f "$PASIM_PATH" ]; then
-            echo "::error::pasim not found at $PASIM_PATH"
+          PASIM_URL="https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-apple-darwin.tar.gz"
+          wget -O patmos-simulator.tar.gz "$PASIM_URL"
+          gtar -xvf patmos-simulator.tar.gz
+
+          PASIM_PATH="$(find "$GITHUB_WORKSPACE/patmos-tools" -type f -name pasim | head -n1 || true)"
+          if [ -z "${PASIM_PATH:-}" ] || [ ! -f "$PASIM_PATH" ]; then
+            echo "::error::pasim not found after extraction"
             ls -laR "$GITHUB_WORKSPACE/patmos-tools" || true
             exit 1
           fi
@@ -60,10 +53,6 @@ jobs:
           echo "path=$PASIM_PATH" >> $GITHUB_OUTPUT
           echo "dir=$(dirname $PASIM_PATH)" >> $GITHUB_OUTPUT
 
-      - name: Debug artifact before upload
-        run: |
-          ls -laR "$GITHUB_WORKSPACE/patmos-tools"
-
       - name: Upload patmos simulator tools
         uses: actions/upload-artifact@v4
         with:
@@ -74,12 +63,12 @@ jobs:
   build-llvm:
     name: Build LLVM
     needs: setup-pasim
-    runs-on: namespace-profile-beta-cicd
+    runs-on: macos-latest
     timeout-minutes: 240
 
     steps:
       - name: Checkout LLVM monorepo
-        uses: namespacelabs/nscloud-checkout-action@v8
+        uses: actions/checkout@v4
         with:
           path: llvm-project
           fetch-depth: 10
@@ -91,19 +80,14 @@ jobs:
 
       - name: Ensure build tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build ccache wget
+          set -euo pipefail
+          brew update
+          brew install ninja ccache wget
 
 
-      - name: Configure Namespace cache volume
-        uses: namespacelabs/nscloud-cache-action@v1
-        with:
-          path: |
-            ${{ env.CCACHE_DIR }}
-            llvm-project/build/
-            llvm-project/build-compiler-rt/
-            llvm-project/build-newlib/
-            llvm-project/build-bench/
+      - name: Skip cloud cache (local emulation)
+        run: |
+          echo "Local macOS emulation: skipping nscloud cache action"
 
       - name: Show ccache config (pre-build)
         run: |
@@ -145,9 +129,9 @@ jobs:
         working-directory: llvm-project
         run: |
           mkdir -p toolchain-payload
-          cp -v -a build/bin toolchain-payload/
-          cp -v -a build/lib toolchain-payload/ || true
-          cp -v -a build/libexec toolchain-payload/ || true
+          cp -R build/bin toolchain-payload/
+          cp -R build/lib toolchain-payload/ || true
+          cp -R build/libexec toolchain-payload/ || true
           tar -czf llvm-toolchain-payload.tar.gz -C toolchain-payload .
 
       - name: Upload toolchain payload
@@ -176,19 +160,20 @@ jobs:
   test-llvm:
     name: Test LLVM
     needs: [build-llvm, setup-pasim]
-    runs-on: namespace-profile-beta-cicd
+    runs-on: macos-latest
     timeout-minutes: 120
 
     steps:
       - name: Checkout LLVM monorepo
-        uses: namespacelabs/nscloud-checkout-action@v8
+        uses: actions/checkout@v4
         with:
           path: llvm-project
 
       - name: Ensure build tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build ccache wget
+          set -euo pipefail
+          brew update
+          brew install ninja ccache wget
 
       - name: Download LLVM toolchain payload
         uses: actions/download-artifact@v4
@@ -208,25 +193,17 @@ jobs:
           name: patmos-simulator-tools
           path: llvm-project/patmos-tools
 
-      - name: Debug artifact after download
-        run: |
-          ls -laR "$(pwd)/patmos-tools"
-
       - name: Setup pasim path
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use the downloaded artifact path
-          PASIM_PATH="$(pwd)/patmos-tools/bin/pasim"
-          PASIM_DIR="$(pwd)/patmos-tools"
-          
-          # Ensure pasim is executable
-          chmod +x "$PASIM_PATH"
+          # Use the path from setup-pasim job outputs
+          PASIM_PATH="${{ needs.setup-pasim.outputs.pasim_path }}"
+          PASIM_DIR="${{ needs.setup-pasim.outputs.pasim_dir }}"
           
           # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$(pwd)/patmos-tools" || true
             exit 1
           fi
           
@@ -279,12 +256,12 @@ jobs:
   build-newlib:
     name: Build Newlib
     needs: build-llvm
-    runs-on: namespace-profile-beta-cicd
+    runs-on: macos-latest
     timeout-minutes: 180
 
     steps:
       - name: Checkout LLVM monorepo (for consistent workspace layout)
-        uses: namespacelabs/nscloud-checkout-action@v8
+        uses: actions/checkout@v4
         with:
           path: llvm-project
 
@@ -304,12 +281,9 @@ jobs:
         working-directory: llvm-project
         run: git clone https://github.com/t-crest/patmos-newlib
 
-      - name: Cache Newlib build directory
-        uses: namespacelabs/nscloud-cache-action@v1
-        with:
-          path: |
-            ${{ env.CCACHE_DIR }}
-            llvm-project/build-newlib/
+      - name: Skip cloud cache (local emulation)
+        run: |
+          echo "Local macOS emulation: skipping nscloud cache action"
 
       - name: Configure and Build Newlib
         working-directory: llvm-project
@@ -343,12 +317,12 @@ jobs:
   test-clang:
     name: Test Clang
     needs: [build-llvm, build-newlib, setup-pasim]
-    runs-on: namespace-profile-beta-cicd
+    runs-on: macos-latest
     timeout-minutes: 120
 
     steps:
       - name: Checkout LLVM monorepo
-        uses: namespacelabs/nscloud-checkout-action@v8
+        uses: actions/checkout@v4
         with:
           path: llvm-project
 
@@ -376,25 +350,17 @@ jobs:
           name: patmos-simulator-tools
           path: llvm-project/patmos-tools
 
-      - name: Debug artifact after download
-        run: |
-          ls -laR "$(pwd)/patmos-tools"
-
       - name: Setup pasim path
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use the downloaded artifact path
-          PASIM_PATH="$(pwd)/patmos-tools/bin/pasim"
-          PASIM_DIR="$(pwd)/patmos-tools"
-          
-          # Ensure pasim is executable
-          chmod +x "$PASIM_PATH"
+          # Use the path from setup-pasim job outputs
+          PASIM_PATH="${{ needs.setup-pasim.outputs.pasim_path }}"
+          PASIM_DIR="${{ needs.setup-pasim.outputs.pasim_dir }}"
           
           # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$(pwd)/patmos-tools" || true
             exit 1
           fi
           
@@ -473,12 +439,12 @@ jobs:
   test-lld:
     name: Test LLD
     needs: [build-llvm, setup-pasim]
-    runs-on: namespace-profile-beta-cicd
+    runs-on: macos-latest
     timeout-minutes: 120
 
     steps:
       - name: Checkout LLVM monorepo
-        uses: namespacelabs/nscloud-checkout-action@v8
+        uses: actions/checkout@v4
         with:
           path: llvm-project
 
@@ -500,25 +466,17 @@ jobs:
           name: patmos-simulator-tools
           path: llvm-project/patmos-tools
 
-      - name: Debug artifact after download
-        run: |
-          ls -laR "$(pwd)/patmos-tools"
-
       - name: Setup pasim path
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use the downloaded artifact path
-          PASIM_PATH="$(pwd)/patmos-tools/bin/pasim"
-          PASIM_DIR="$(pwd)/patmos-tools"
-          
-          # Ensure pasim is executable
-          chmod +x "$PASIM_PATH"
+          # Use the path from setup-pasim job outputs
+          PASIM_PATH="${{ needs.setup-pasim.outputs.pasim_path }}"
+          PASIM_DIR="${{ needs.setup-pasim.outputs.pasim_dir }}"
           
           # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$(pwd)/patmos-tools" || true
             exit 1
           fi
           
@@ -582,19 +540,20 @@ jobs:
   build-compiler-rt:
     name: Build Compiler-RT
     needs: [build-llvm, setup-pasim]
-    runs-on: namespace-profile-beta-cicd
+    runs-on: macos-latest
     timeout-minutes: 180
 
     steps:
       - name: Checkout LLVM monorepo
-        uses: namespacelabs/nscloud-checkout-action@v8
+        uses: actions/checkout@v4
         with:
           path: llvm-project
 
       - name: Ensure build tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build ccache wget
+          set -euo pipefail
+          brew update
+          brew install ninja ccache wget
 
       - name: Download LLVM toolchain payload
         uses: actions/download-artifact@v4
@@ -614,25 +573,17 @@ jobs:
           name: patmos-simulator-tools
           path: llvm-project/patmos-tools
 
-      - name: Debug artifact after download
-        run: |
-          ls -laR "$(pwd)/patmos-tools"
-
       - name: Setup pasim path
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use the downloaded artifact path
-          PASIM_PATH="$(pwd)/patmos-tools/bin/pasim"
-          PASIM_DIR="$(pwd)/patmos-tools"
-          
-          # Ensure pasim is executable
-          chmod +x "$PASIM_PATH"
+          # Use the path from setup-pasim job outputs
+          PASIM_PATH="${{ needs.setup-pasim.outputs.pasim_path }}"
+          PASIM_DIR="${{ needs.setup-pasim.outputs.pasim_dir }}"
           
           # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$(pwd)/patmos-tools" || true
             exit 1
           fi
           
@@ -642,12 +593,9 @@ jobs:
           echo "PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
           PATH="$PASIM_DIR:$PATH" command -v "$(basename "$PASIM_PATH")"
 
-      - name: Cache Compiler-RT build directory
-        uses: namespacelabs/nscloud-cache-action@v1
-        with:
-          path: |
-            ${{ env.CCACHE_DIR }}
-            llvm-project/build-compiler-rt/
+      - name: Skip cloud cache (local emulation)
+        run: |
+          echo "Local macOS emulation: skipping nscloud cache action"
 
       - name: Configure Compiler-RT
         working-directory: llvm-project
@@ -730,22 +678,18 @@ jobs:
   test-benchmarks:
     name: Test Benchmarks
     needs: [test-llvm, test-clang, test-lld, build-compiler-rt]
-    runs-on: namespace-profile-beta-cicd
+    runs-on: macos-latest
     timeout-minutes: 120
 
     steps:
       - name: Checkout LLVM monorepo
-        uses: namespacelabs/nscloud-checkout-action@v8
+        uses: actions/checkout@v4
         with:
           path: llvm-project
 
-      - name: Cache benchmark/build state (Namespace cache volume)
-        uses: namespacelabs/nscloud-cache-action@v1
-        with:
-          path: |
-            llvm-project/build/
-            llvm-project/build-bench/
-            ~/.ccache/
+      - name: Skip cloud cache (local emulation)
+        run: |
+          echo "Local macOS emulation: skipping nscloud cache action"
 
       - name: Download LLVM toolchain payload
         uses: actions/download-artifact@v4
@@ -796,7 +740,7 @@ jobs:
   package:
     name: Package
     needs: [test-llvm, test-clang, test-lld, build-compiler-rt]
-    runs-on: namespace-profile-beta-cicd
+    runs-on: macos-latest
     timeout-minutes: 60
 
     steps:
@@ -822,8 +766,8 @@ jobs:
         run: |
           mkdir -p out/toolchain
           tar -xzf artifacts/llvm-toolchain-payload.tar.gz -C out/toolchain
-          cp -a artifacts/newlib-sysroot out/toolchain/newlib-sysroot
-          cp -a artifacts/compiler-rt-build out/toolchain/compiler-rt-build
+          cp -R artifacts/newlib-sysroot out/toolchain/newlib-sysroot
+          cp -R artifacts/compiler-rt-build out/toolchain/compiler-rt-build
           tar -czf llvm-patmos-toolchain.tar.gz -C out toolchain
 
       - name: Upload final package
