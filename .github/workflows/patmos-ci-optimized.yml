@@ -210,7 +210,7 @@ jobs:
 
       - name: Debug artifact after download
         run: |
-          ls -laR "$(pwd)/patmos-tools"
+          ls -laR "$(pwd)/llvm-project/patmos-tools"
 
       - name: Setup pasim path
         working-directory: llvm-project
@@ -226,7 +226,7 @@ jobs:
           # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$(pwd)/patmos-tools" || true
+            ls -laR "$(pwd)/llvm-project/patmos-tools" || true
             exit 1
           fi
           
@@ -378,7 +378,7 @@ jobs:
 
       - name: Debug artifact after download
         run: |
-          ls -laR "$(pwd)/patmos-tools"
+          ls -laR "$(pwd)/llvm-project/patmos-tools"
 
       - name: Setup pasim path
         working-directory: llvm-project
@@ -394,7 +394,7 @@ jobs:
           # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$(pwd)/patmos-tools" || true
+            ls -laR "$(pwd)/llvm-project/patmos-tools" || true
             exit 1
           fi
           
@@ -502,7 +502,7 @@ jobs:
 
       - name: Debug artifact after download
         run: |
-          ls -laR "$(pwd)/patmos-tools"
+          ls -laR "$(pwd)/llvm-project/patmos-tools"
 
       - name: Setup pasim path
         working-directory: llvm-project
@@ -518,7 +518,7 @@ jobs:
           # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$(pwd)/patmos-tools" || true
+            ls -laR "$(pwd)/llvm-project/patmos-tools" || true
             exit 1
           fi
           
@@ -616,7 +616,7 @@ jobs:
 
       - name: Debug artifact after download
         run: |
-          ls -laR "$(pwd)/patmos-tools"
+          ls -laR "$(pwd)/llvm-project/patmos-tools"
 
       - name: Setup pasim path
         working-directory: llvm-project
@@ -632,7 +632,7 @@ jobs:
           # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$(pwd)/patmos-tools" || true
+            ls -laR "$(pwd)/llvm-project/patmos-tools" || true
             exit 1
           fi
           

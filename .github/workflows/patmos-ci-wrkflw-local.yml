@@ -1,6 +1,14 @@
 name: LLVM Patmos CI - Optimized
 
-
+on:
+  push:
+    branches:
+      - main
+      - patmos-llvm-22x-rusty*
+  pull_request:
+    branches:
+      - main
+      - patmos-llvm-22x-rusty*
 env:
   NIX_BUILD_CORES: 8
   CI_MAX_PARALLEL: 5
@@ -12,7 +20,7 @@ env:
 jobs:
   setup-pasim:
     name: Setup Patmos Simulator
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
       pasim_path: ${{ steps.set_pasim_path.outputs.path }}  # <-- Add output
@@ -22,8 +30,8 @@ jobs:
       - name: Ensure tools for downloading simulator
         run: |
           set -euo pipefail
-          brew update
-          brew install wget gnu-tar
+             apt-get update
+             apt-get install -y wget tar
 
       - name: Download and validate pasim
         id: set_pasim_path  # <-- Add ID for outputs
@@ -31,9 +39,9 @@ jobs:
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/patmos-tools"
           cd "$GITHUB_WORKSPACE/patmos-tools"
-          PASIM_URL="https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-apple-darwin.tar.gz"
+          PASIM_URL="https://github.com/t-crest/patmos-simulator/releases/latest/download/patmos-simulator-x86_64-linux-gnu.tar.gz"
           wget -O patmos-simulator.tar.gz "$PASIM_URL"
-          gtar -xvf patmos-simulator.tar.gz
+          tar -xvf patmos-simulator.tar.gz
 
           PASIM_PATH="$(find "$GITHUB_WORKSPACE/patmos-tools" -type f -name pasim | head -n1 || true)"
           if [ -z "${PASIM_PATH:-}" ] || [ ! -f "$PASIM_PATH" ]; then
@@ -63,7 +71,7 @@ jobs:
   build-llvm:
     name: Build LLVM
     needs: setup-pasim
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 240
 
     steps:
@@ -81,8 +89,8 @@ jobs:
       - name: Ensure build tools
         run: |
           set -euo pipefail
-          brew update
-          brew install ninja ccache wget
+             apt-get update
+             apt-get install -y ninja-build ccache wget
 
 
       - name: Skip cloud cache (local emulation)
@@ -97,7 +105,19 @@ jobs:
       - name: Configure LLVM
         working-directory: llvm-project
         run: |
-          cmake -S llvm -B build \
+          if [ -d "llvm" ]; then
+            LLVM_SRC_DIR="llvm"
+          elif [ -d "../llvm" ]; then
+            LLVM_SRC_DIR="../llvm"
+          else
+            echo "::error::Cannot locate LLVM source directory (expected llvm or ../llvm)"
+            pwd
+            ls -la
+            ls -la .. || true
+            exit 1
+          fi
+
+          cmake -S "$LLVM_SRC_DIR" -B build \
             -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -160,7 +180,7 @@ jobs:
   test-llvm:
     name: Test LLVM
     needs: [build-llvm, setup-pasim]
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 120
 
     steps:
@@ -172,8 +192,8 @@ jobs:
       - name: Ensure build tools
         run: |
           set -euo pipefail
-          brew update
-          brew install ninja ccache wget
+             apt-get update
+             apt-get install -y ninja-build ccache wget
 
       - name: Download LLVM toolchain payload
         uses: actions/download-artifact@v4
@@ -197,15 +217,14 @@ jobs:
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use the path from setup-pasim job outputs
-          PASIM_PATH="${{ needs.setup-pasim.outputs.pasim_path }}"
-          PASIM_DIR="${{ needs.setup-pasim.outputs.pasim_dir }}"
-          
-          # Validate pasim exists and is executable
-          if [ ! -x "$PASIM_PATH" ]; then
-            echo "::error::pasim not found or not executable at $PASIM_PATH"
+          PASIM_PATH="$(find "$(pwd)/patmos-tools" -type f -name pasim | head -n1 || true)"
+          if [ -z "${PASIM_PATH:-}" ] || [ ! -f "$PASIM_PATH" ]; then
+            echo "::error::pasim not found in downloaded artifact"
+            ls -laR "$(pwd)/patmos-tools" || true
             exit 1
           fi
+          chmod +x "$PASIM_PATH"
+          PASIM_DIR="$(dirname "$PASIM_PATH")"
           
           # Add to PATH and environment
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
@@ -222,8 +241,12 @@ jobs:
           echo ""
           echo "=== Checking required directories ==="
           test -d "$(pwd)/build" || { echo "::error::build/ directory missing"; exit 1; }
-          test -d "$(pwd)/llvm" || { echo "::error::llvm/ directory missing"; exit 1; }
-          echo "build/ and llvm/ directories found"
+          if [ -d "$(pwd)/llvm" ] || [ -d "$(pwd)/../llvm" ]; then
+            echo "build/ and llvm/ directories found"
+          else
+            echo "::error::llvm/ directory missing (expected ./llvm or ../llvm)"
+            exit 1
+          fi
 
       - name: Test LLVM (Patmos-filtered)
         working-directory: llvm-project
@@ -240,7 +263,11 @@ jobs:
           export PASIM="$PASIM_PATH"
           
           LIT_BIN="$(pwd)/build/bin/llvm-lit"
-          TEST_DIR="$(pwd)/llvm/test"
+          if [ -d "$(pwd)/llvm/test" ]; then
+            TEST_DIR="$(pwd)/llvm/test"
+          else
+            TEST_DIR="$(pwd)/../llvm/test"
+          fi
           SITE_CFG="$(pwd)/build/test/lit.site.cfg.py"
           
           test -x "$LIT_BIN" || { echo "::error::Missing llvm-lit at $LIT_BIN"; exit 1; }
@@ -256,7 +283,7 @@ jobs:
   build-newlib:
     name: Build Newlib
     needs: build-llvm
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 180
 
     steps:
@@ -317,7 +344,7 @@ jobs:
   test-clang:
     name: Test Clang
     needs: [build-llvm, build-newlib, setup-pasim]
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 120
 
     steps:
@@ -354,15 +381,14 @@ jobs:
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use the path from setup-pasim job outputs
-          PASIM_PATH="${{ needs.setup-pasim.outputs.pasim_path }}"
-          PASIM_DIR="${{ needs.setup-pasim.outputs.pasim_dir }}"
-          
-          # Validate pasim exists and is executable
-          if [ ! -x "$PASIM_PATH" ]; then
-            echo "::error::pasim not found or not executable at $PASIM_PATH"
+          PASIM_PATH="$(find "$(pwd)/patmos-tools" -type f -name pasim | head -n1 || true)"
+          if [ -z "${PASIM_PATH:-}" ] || [ ! -f "$PASIM_PATH" ]; then
+            echo "::error::pasim not found in downloaded artifact"
+            ls -laR "$(pwd)/patmos-tools" || true
             exit 1
           fi
+          chmod +x "$PASIM_PATH"
+          PASIM_DIR="$(dirname "$PASIM_PATH")"
           
           # Add to PATH and environment
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
@@ -396,8 +422,10 @@ jobs:
             echo "Using llvm/clang layout"
           elif [ -d "$(pwd)/clang" ]; then
             echo "Using top-level clang layout"
+          elif [ -d "$(pwd)/../clang" ]; then
+            echo "Using parent-level clang layout"
           else
-            echo "::error::Missing clang sources (expected llvm/clang or clang)"
+            echo "::error::Missing clang sources (expected llvm/clang, clang, or ../clang)"
             exit 1
           fi
 
@@ -421,8 +449,10 @@ jobs:
           LIT_BIN="$(pwd)/build/bin/llvm-lit"
           if [ -d "$(pwd)/llvm/clang/test" ]; then
             TEST_DIR="$(pwd)/llvm/clang/test"
-          else
+          elif [ -d "$(pwd)/clang/test" ]; then
             TEST_DIR="$(pwd)/clang/test"
+          else
+            TEST_DIR="$(pwd)/../clang/test"
           fi
           SITE_CFG="$(pwd)/build/test/lit.site.cfg.py"
 
@@ -439,7 +469,7 @@ jobs:
   test-lld:
     name: Test LLD
     needs: [build-llvm, setup-pasim]
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 120
 
     steps:
@@ -470,15 +500,14 @@ jobs:
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use the path from setup-pasim job outputs
-          PASIM_PATH="${{ needs.setup-pasim.outputs.pasim_path }}"
-          PASIM_DIR="${{ needs.setup-pasim.outputs.pasim_dir }}"
-          
-          # Validate pasim exists and is executable
-          if [ ! -x "$PASIM_PATH" ]; then
-            echo "::error::pasim not found or not executable at $PASIM_PATH"
+          PASIM_PATH="$(find "$(pwd)/patmos-tools" -type f -name pasim | head -n1 || true)"
+          if [ -z "${PASIM_PATH:-}" ] || [ ! -f "$PASIM_PATH" ]; then
+            echo "::error::pasim not found in downloaded artifact"
+            ls -laR "$(pwd)/patmos-tools" || true
             exit 1
           fi
+          chmod +x "$PASIM_PATH"
+          PASIM_DIR="$(dirname "$PASIM_PATH")"
           
           # Add to PATH and environment
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
@@ -500,8 +529,10 @@ jobs:
             echo "Using llvm/lld layout"
           elif [ -d "$(pwd)/lld" ]; then
             echo "Using top-level lld layout"
+          elif [ -d "$(pwd)/../lld" ]; then
+            echo "Using parent-level lld layout"
           else
-            echo "::error::Missing lld sources (expected llvm/lld or lld)"
+            echo "::error::Missing lld sources (expected llvm/lld, lld, or ../lld)"
             exit 1
           fi
 
@@ -522,8 +553,10 @@ jobs:
           LIT_BIN="$(pwd)/build/bin/llvm-lit"
           if [ -d "$(pwd)/llvm/lld/test" ]; then
             TEST_DIR="$(pwd)/llvm/lld/test"
-          else
+          elif [ -d "$(pwd)/lld/test" ]; then
             TEST_DIR="$(pwd)/lld/test"
+          else
+            TEST_DIR="$(pwd)/../lld/test"
           fi
           SITE_CFG="$(pwd)/build/test/lit.site.cfg.py"
 
@@ -540,7 +573,7 @@ jobs:
   build-compiler-rt:
     name: Build Compiler-RT
     needs: [build-llvm, setup-pasim]
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 180
 
     steps:
@@ -552,8 +585,8 @@ jobs:
       - name: Ensure build tools
         run: |
           set -euo pipefail
-          brew update
-          brew install ninja ccache wget
+             apt-get update
+             apt-get install -y ninja-build ccache wget
 
       - name: Download LLVM toolchain payload
         uses: actions/download-artifact@v4
@@ -577,15 +610,14 @@ jobs:
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use the path from setup-pasim job outputs
-          PASIM_PATH="${{ needs.setup-pasim.outputs.pasim_path }}"
-          PASIM_DIR="${{ needs.setup-pasim.outputs.pasim_dir }}"
-          
-          # Validate pasim exists and is executable
-          if [ ! -x "$PASIM_PATH" ]; then
-            echo "::error::pasim not found or not executable at $PASIM_PATH"
+          PASIM_PATH="$(find "$(pwd)/patmos-tools" -type f -name pasim | head -n1 || true)"
+          if [ -z "${PASIM_PATH:-}" ] || [ ! -f "$PASIM_PATH" ]; then
+            echo "::error::pasim not found in downloaded artifact"
+            ls -laR "$(pwd)/patmos-tools" || true
             exit 1
           fi
+          chmod +x "$PASIM_PATH"
+          PASIM_DIR="$(dirname "$PASIM_PATH")"
           
           # Add to PATH and environment
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
@@ -602,9 +634,22 @@ jobs:
         run: |
           mkdir -p build-compiler-rt
           cd build-compiler-rt
-          cmake ../compiler-rt \
+          if [ -d "../compiler-rt" ]; then
+            COMPILER_RT_SRC="../compiler-rt"
+          elif [ -d "../../compiler-rt" ]; then
+            COMPILER_RT_SRC="../../compiler-rt"
+          else
+            echo "::error::Cannot locate compiler-rt source directory"
+            pwd
+            ls -la .. || true
+            ls -la ../.. || true
+            exit 1
+          fi
+          COMPILER_RT_TOOLCHAIN_FILE="$COMPILER_RT_SRC/cmake/patmos-clang-toolchain.cmake"
+
+          cmake "$COMPILER_RT_SRC" \
             -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE=../compiler-rt/cmake/patmos-clang-toolchain.cmake \
+            -DCMAKE_TOOLCHAIN_FILE="$COMPILER_RT_TOOLCHAIN_FILE" \
             -DCMAKE_C_COMPILER="$(pwd)/../build/bin/clang" \
             -DCMAKE_CXX_COMPILER="$(pwd)/../build/bin/clang++" \
             -DCOMPILER_RT_TEST_COMPILER="$(pwd)/../build/bin/clang" \
@@ -629,7 +674,12 @@ jobs:
           echo ""
           echo "=== Checking required directories ==="
           test -d "$(pwd)/build" || { echo "::error::build/ directory missing"; exit 1; }
-          test -d "$(pwd)/compiler-rt" || { echo "::error::compiler-rt/ directory missing"; exit 1; }
+          if [ -d "$(pwd)/compiler-rt" ] || [ -d "$(pwd)/../compiler-rt" ]; then
+            true
+          else
+            echo "::error::compiler-rt/ directory missing (expected ./compiler-rt or ../compiler-rt)"
+            exit 1
+          fi
           test -d "$(pwd)/build-compiler-rt" || { echo "::error::build-compiler-rt/ directory missing"; exit 1; }
 
       - name: Test Compiler-RT
@@ -655,7 +705,11 @@ jobs:
           
           # Use absolute paths for llvm-lit
           LIT_BIN="$(pwd)/build/bin/llvm-lit"
-          TEST_DIR="$(pwd)/compiler-rt/test"  # Compiler-RT test suite
+          if [ -d "$(pwd)/compiler-rt/test" ]; then
+            TEST_DIR="$(pwd)/compiler-rt/test"
+          else
+            TEST_DIR="$(pwd)/../compiler-rt/test"
+          fi
           SITE_CFG="$(pwd)/build/test/lit.site.cfg.py"  # <-- Fixed: LLVM's lit.site.cfg.py
           
           test -x "$LIT_BIN" || { echo "::error::Missing llvm-lit at $LIT_BIN"; exit 1; }
@@ -678,7 +732,7 @@ jobs:
   test-benchmarks:
     name: Test Benchmarks
     needs: [test-llvm, test-clang, test-lld, build-compiler-rt]
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 120
 
     steps:
@@ -740,7 +794,7 @@ jobs:
   package:
     name: Package
     needs: [test-llvm, test-clang, test-lld, build-compiler-rt]
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
