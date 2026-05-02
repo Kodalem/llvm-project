@@ -147,6 +147,14 @@ jobs:
           cp -v -a build/bin toolchain-payload/
           cp -v -a build/lib toolchain-payload/ || true
           cp -v -a build/libexec toolchain-payload/ || true
+          # Include all CMake-generated lit site configs so test jobs can run llvm-lit
+          # The payload is unpacked into build/, so we strip the leading "build/" prefix.
+          find build -name "lit.site.cfg.py" -type f | while IFS= read -r f; do
+            rel="${f#build/}"
+            dest="toolchain-payload/$rel"
+            mkdir -p "$(dirname "$dest")"
+            cp "$f" "$dest"
+          done || true
           tar -czf llvm-toolchain-payload.tar.gz -C toolchain-payload .
 
       - name: Upload toolchain payload
@@ -475,13 +483,17 @@ jobs:
           else
             TEST_DIR="$(pwd)/clang/test"
           fi
-          SITE_CFG="$(pwd)/build/test/lit.site.cfg.py"
+          # Use the Clang-specific site config; fall back to the top-level LLVM one
+          if [ -f "$(pwd)/build/tools/clang/test/lit.site.cfg.py" ]; then
+            SITE_CFG="$(pwd)/build/tools/clang/test/lit.site.cfg.py"
+          else
+            SITE_CFG="$(pwd)/build/test/lit.site.cfg.py"
+          fi
 
           test -x "$LIT_BIN" || { echo "::error::Missing llvm-lit at $LIT_BIN"; exit 1; }
           test -f "$SITE_CFG" || {
             echo "::error::Missing lit.site.cfg.py at $SITE_CFG"
-            ls -la "$(pwd)/build/test/" || true
-            find "$(pwd)/build" -maxdepth 4 -name "lit.site.cfg.py" || true
+            find "$(pwd)/build" -maxdepth 5 -name "lit.site.cfg.py" || true
             exit 1
           }
 
@@ -593,13 +605,17 @@ jobs:
           else
             TEST_DIR="$(pwd)/lld/test"
           fi
-          SITE_CFG="$(pwd)/build/test/lit.site.cfg.py"
+          # Use the LLD-specific site config; fall back to the top-level LLVM one
+          if [ -f "$(pwd)/build/tools/lld/test/lit.site.cfg.py" ]; then
+            SITE_CFG="$(pwd)/build/tools/lld/test/lit.site.cfg.py"
+          else
+            SITE_CFG="$(pwd)/build/test/lit.site.cfg.py"
+          fi
 
           test -x "$LIT_BIN" || { echo "::error::Missing llvm-lit at $LIT_BIN"; exit 1; }
           test -f "$SITE_CFG" || {
             echo "::error::Missing lit.site.cfg.py at $SITE_CFG"
-            ls -la "$(pwd)/build/test/" || true
-            find "$(pwd)/build" -maxdepth 4 -name "lit.site.cfg.py" || true
+            find "$(pwd)/build" -maxdepth 5 -name "lit.site.cfg.py" || true
             exit 1
           }
 
@@ -743,13 +759,17 @@ jobs:
           # Use absolute paths for llvm-lit
           LIT_BIN="$(pwd)/build/bin/llvm-lit"
           TEST_DIR="$(pwd)/compiler-rt/test"  # Compiler-RT test suite
-          SITE_CFG="$(pwd)/build/test/lit.site.cfg.py"  # <-- Fixed: LLVM's lit.site.cfg.py
+          # Compiler-RT has its own site config under build-compiler-rt/
+          if [ -f "$(pwd)/build-compiler-rt/test/lit.site.cfg.py" ]; then
+            SITE_CFG="$(pwd)/build-compiler-rt/test/lit.site.cfg.py"
+          else
+            SITE_CFG="$(pwd)/build/test/lit.site.cfg.py"
+          fi
           
           test -x "$LIT_BIN" || { echo "::error::Missing llvm-lit at $LIT_BIN"; exit 1; }
           test -f "$SITE_CFG" || {
             echo "::error::Missing lit.site.cfg.py at $SITE_CFG"
-            ls -la "$(pwd)/build/test/" || true
-            find "$(pwd)/build" -maxdepth 4 -name "lit.site.cfg.py" || true
+            find "$(pwd)/build" "$(pwd)/build-compiler-rt" -maxdepth 5 -name "lit.site.cfg.py" || true
             exit 1
           }
           
