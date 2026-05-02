@@ -306,6 +306,15 @@ runs:
         exclude: Clang-Unit
         parallelism: ${{ inputs.parallelism }}
 
+    - name: Create clang-12 symlink for PatmosPackage
+      if: inputs.enable-package == 'true'
+      shell: bash
+      working-directory: ${{env.BUILD_PATH}}
+      run: |
+        if [ ! -f bin/clang-12 ] && [ -f bin/clang ]; then
+          ln -sf "$PWD/bin/clang" "$PWD/bin/clang-12"
+        fi
+
     - name: Build Package with Ninja
       working-directory: ${{env.BUILD_PATH}}
       if: inputs.enable-package == 'true'
