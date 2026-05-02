@@ -138,13 +138,7 @@ jobs:
           PASIM: ${{ env.PASIM }}
         run: |
           set -euo pipefail
-          PASIM_PATH="$(find "$GITHUB_WORKSPACE" -maxdepth 8 -type f -name pasim | head -n1 || true)"
-          if [ -z "${PASIM_PATH:-}" ]; then
-            echo "Could not find pasim under $GITHUB_WORKSPACE"
-            echo "PATMOS_PASIM from env: ${PATMOS_PASIM:-<unset>}"
-            find "$GITHUB_WORKSPACE" -maxdepth 8 -type f | sort | sed -n '1,200p'
-            exit 1
-          fi
+          echo "PATMOS_PASIM from env: $PATMOS_PASIM"
           chmod +x "$PASIM_PATH"
           export PATMOS_PASIM="$PASIM_PATH"
           export PASIM="$PASIM_PATH"
