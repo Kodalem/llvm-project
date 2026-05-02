@@ -306,13 +306,29 @@ runs:
         exclude: Clang-Unit
         parallelism: ${{ inputs.parallelism }}
 
-    - name: Create clang-12 symlink for PatmosPackage
+    - name: Create clang symlink for PatmosPackage
       if: inputs.enable-package == 'true'
       shell: bash
       working-directory: ${{env.BUILD_PATH}}
       run: |
-        if [ ! -f bin/clang-12 ] && [ -f bin/clang ]; then
-          ln -sf "$PWD/bin/clang" "$PWD/bin/clang-12"
+        # Find the clang binary symlink and create clang-{MAJOR_VERSION} if needed
+        CLANG_BINARY=""
+        if [ -f "bin/clang" ]; then
+          CLANG_BINARY="bin/clang"
+        fi
+        
+        if [ -n "$CLANG_BINARY" ]; then
+          # Extract major version from clang --version output
+          CLANG_VERSION=$($CLANG_BINARY --version | grep -oP "(?<=version )[\d.]+" | cut -d. -f1)
+          
+          # Create symlink clang-{MAJOR} if it doesn't exist
+          if [ -n "$CLANG_VERSION" ]; then
+            CLANG_VERSIONED="bin/clang-$CLANG_VERSION"
+            if [ ! -f "$CLANG_VERSIONED" ]; then
+              ln -sf clang "$CLANG_VERSIONED"
+              echo "Created symlink: $CLANG_VERSIONED -> clang"
+            fi
+          fi
         fi
 
     - name: Build Package with Ninja

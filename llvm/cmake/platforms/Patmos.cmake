@@ -1,12 +1,37 @@
 
-# Save the target triple in a variable
-execute_process( COMMAND gcc -dumpmachine OUTPUT_VARIABLE DUMP_MACHINE OUTPUT_STRIP_TRAILING_WHITESPACE )
+# Save the target triple in a variable.
+# Prefer LLVM's detected host triple so packaging works with clang-based builds
+# and in environments where a plain `gcc` binary is unavailable.
+set(DUMP_MACHINE "${LLVM_HOST_TRIPLE}")
+
+if(NOT DUMP_MACHINE AND DEFINED CMAKE_C_COMPILER AND EXISTS "${CMAKE_C_COMPILER}")
+	execute_process(
+		COMMAND "${CMAKE_C_COMPILER}" -dumpmachine
+		OUTPUT_VARIABLE DUMP_MACHINE
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+		ERROR_QUIET
+	)
+endif()
+
+if(NOT DUMP_MACHINE)
+	execute_process(
+		COMMAND gcc -dumpmachine
+		OUTPUT_VARIABLE DUMP_MACHINE
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+		ERROR_QUIET
+	)
+endif()
+
 message(STATUS "Machine Triple: ${DUMP_MACHINE}")
-if (${DUMP_MACHINE} MATCHES "x86_64-linux-gnu")
+
+# Set Clang resource version dynamically based on LLVM version
+set(CLANG_RESOURCE_VERSION "${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}")
+if ("${DUMP_MACHINE}" MATCHES "x86_64.*linux-gnu")
+	# Accept variants like x86_64-unknown-linux-gnu (common in Nix) as well
 	set( TARGET_TRIPLE "x86_64-linux-gnu")
-elseif(${DUMP_MACHINE} MATCHES "x86_64-apple-darwin.*")
+elseif("${DUMP_MACHINE}" MATCHES "x86_64-apple-darwin.*")
 	set( TARGET_TRIPLE "x86_64-apple-darwin")
-elseif(${DUMP_MACHINE} MATCHES "arm64-apple-darwin.*")
+elseif("${DUMP_MACHINE}" MATCHES "(arm64|aarch64)-apple-darwin.*")
 	set( TARGET_TRIPLE "arm64-apple-darwin")
 else()
 	message(FATAL_ERROR "Unsupported platform for packaging")
@@ -40,8 +65,8 @@ set( NEWLIB_INCLUDES # List of dirs from which to get only the files
 set( MOVED_BINARIES
 	"${PACKAGE_TEMP_DIR}/bin/patmos-llc" 
 	"${PACKAGE_TEMP_DIR}/bin/patmos-llvm-link" 
-	"${PACKAGE_TEMP_DIR}/bin/patmos-clang-12" 
-	"${PACKAGE_TEMP_DIR}/bin/patmos-llvm-config" 
+	"${PACKAGE_TEMP_DIR}/bin/patmos-clang-${LLVM_VERSION_MAJOR}"
+	"${PACKAGE_TEMP_DIR}/bin/patmos-llvm-config"
 	"${PACKAGE_TEMP_DIR}/bin/patmos-llvm-objdump" 
 	"${PACKAGE_TEMP_DIR}/bin/patmos-opt" 
 	"${PACKAGE_TEMP_DIR}/bin/patmos-lld"
@@ -65,7 +90,7 @@ add_custom_target(PatmosPackageTempDirs
     "${CMAKE_COMMAND}" -E make_directory 
 	"${PACKAGE_TEMP_DIR}/bin" 
 	"${PACKAGE_TEMP_DIR}/lib" 
-	"${PACKAGE_TEMP_DIR}/lib/clang/12.0.1/include" 
+	"${PACKAGE_TEMP_DIR}/lib/clang/${CLANG_RESOURCE_VERSION}/include"
 	"${PACKAGE_TEMP_DIR}/${PATMOS_TRIPLE}/lib"
 	"${PACKAGE_TEMP_DIR}/${PATMOS_TRIPLE}/include"
 )
@@ -74,7 +99,7 @@ add_custom_command(
 	
 	COMMAND cp "${CMAKE_BINARY_DIR}/bin/llc" "${PACKAGE_TEMP_DIR}/bin/patmos-llc"
 	COMMAND cp "${CMAKE_BINARY_DIR}/bin/llvm-link" "${PACKAGE_TEMP_DIR}/bin/patmos-llvm-link"
-	COMMAND cp "${CMAKE_BINARY_DIR}/bin/clang-12" "${PACKAGE_TEMP_DIR}/bin/patmos-clang-12"
+	COMMAND cp "${CMAKE_BINARY_DIR}/bin/clang-${LLVM_VERSION_MAJOR}" "${PACKAGE_TEMP_DIR}/bin/patmos-clang-${LLVM_VERSION_MAJOR}"
 	COMMAND cp "${CMAKE_BINARY_DIR}/bin/llvm-config" "${PACKAGE_TEMP_DIR}/bin/patmos-llvm-config"
 	COMMAND cp "${CMAKE_BINARY_DIR}/bin/llvm-objdump" "${PACKAGE_TEMP_DIR}/bin/patmos-llvm-objdump"
 	COMMAND cp "${CMAKE_BINARY_DIR}/bin/opt" "${PACKAGE_TEMP_DIR}/bin/patmos-opt"
@@ -82,8 +107,8 @@ add_custom_command(
 
 	DEPENDS 
 		PatmosPackageTempDirs 
-		"${CMAKE_BINARY_DIR}/bin/llc" "${CMAKE_BINARY_DIR}/bin/llvm-link" "${CMAKE_BINARY_DIR}/bin/clang-12" 
-		"${CMAKE_BINARY_DIR}/bin/llvm-config" "${CMAKE_BINARY_DIR}/bin/llvm-objdump" "${CMAKE_BINARY_DIR}/bin/opt" 
+		"${CMAKE_BINARY_DIR}/bin/llc" "${CMAKE_BINARY_DIR}/bin/llvm-link" "${CMAKE_BINARY_DIR}/bin/clang-${LLVM_VERSION_MAJOR}"
+		"${CMAKE_BINARY_DIR}/bin/llvm-config" "${CMAKE_BINARY_DIR}/bin/llvm-objdump" "${CMAKE_BINARY_DIR}/bin/opt"
 		"${CMAKE_BINARY_DIR}/bin/lld" 
 )
 add_custom_command(
@@ -108,12 +133,12 @@ add_custom_command(
 		"../build-compiler-rt/lib/generic/libclang_rt.builtins-patmos.a"
 )
 add_custom_command(
-	OUTPUT "${PACKAGE_TEMP_DIR}/lib/clang/12.0.1/include/stdint.h" 	# We need a target, but don't want to define all the files
-	
-	COMMAND rsync "${CMAKE_BINARY_DIR}/lib/clang/12.0.1/include/*" "${PACKAGE_TEMP_DIR}/lib/clang/12.0.1/include/"
-	
+	OUTPUT "${PACKAGE_TEMP_DIR}/lib/clang/${CLANG_RESOURCE_VERSION}/include/stdint.h" 	# We need a target, but don't want to define all the files
+
+	COMMAND rsync "${CMAKE_BINARY_DIR}/lib/clang/${CLANG_RESOURCE_VERSION}/include/*" "${PACKAGE_TEMP_DIR}/lib/clang/${CLANG_RESOURCE_VERSION}/include/"
+
 	DEPENDS 
-		PatmosPackageTempDirs "${CMAKE_BINARY_DIR}/lib/clang/12.0.1/include/stdint.h"
+		PatmosPackageTempDirs "${CMAKE_BINARY_DIR}/lib/clang/${CLANG_RESOURCE_VERSION}/include/stdint.h"
 )
 add_custom_command(
 	OUTPUT "${PACKAGE_TEMP_DIR}/${PATMOS_TRIPLE}/include/newlib.h" # We need a target, but don't want to define all the files
@@ -127,7 +152,7 @@ add_custom_command(
 )
 
 ADD_CUSTOM_TARGET(symlink-clang-lld
-	COMMAND ${CMAKE_COMMAND} -E create_symlink patmos-clang-12 ${PACKAGE_TEMP_DIR}/bin/patmos-clang
+	COMMAND ${CMAKE_COMMAND} -E create_symlink patmos-clang-${LLVM_VERSION_MAJOR} ${PACKAGE_TEMP_DIR}/bin/patmos-clang
 	COMMAND ${CMAKE_COMMAND} -E create_symlink patmos-lld ${PACKAGE_TEMP_DIR}/bin/patmos-ld.lld
 	DEPENDS clang PatmosPackageTempDirs		  
 	)	
@@ -160,8 +185,8 @@ add_custom_command(
 	
 	DEPENDS 
 		${PACKAGE_TARGETS} ${PACKAGE_ITEMS_LIBS} ${MOVED_BINARIES} symlink-clang-lld 
-		"${PACKAGE_TEMP_DIR}/lib/clang/12.0.1/include/stdint.h" 
-		"${PACKAGE_TEMP_DIR}/${PATMOS_TRIPLE}/include/newlib.h" 
+		"${PACKAGE_TEMP_DIR}/lib/clang/${CLANG_RESOURCE_VERSION}/include/stdint.h"
+		"${PACKAGE_TEMP_DIR}/${PATMOS_TRIPLE}/include/newlib.h"
 )
 # Rename release tarball target to something better.
 add_custom_target(PatmosPackage DEPENDS ${PACKAGE_TAR_GZ})
