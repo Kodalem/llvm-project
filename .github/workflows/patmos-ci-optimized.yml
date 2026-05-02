@@ -206,7 +206,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: patmos-simulator-tools
-          path: llvm-project/patmos-tools
+          path: llvm-project
 
       - name: Debug artifact after download
         run: |
@@ -216,20 +216,25 @@ jobs:
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use the downloaded artifact path
-          PASIM_PATH="$(pwd)/patmos-tools/bin/pasim"
-          PASIM_DIR="$(pwd)/patmos-tools"
-          
-          # Ensure pasim is executable
+          # Use absolute paths to avoid working directory confusion
+          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
+          PASIM_DIR="$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+
+          # Check file existence before chmod
+          if [ ! -f "$PASIM_PATH" ]; then
+            echo "::error::pasim not found at $PASIM_PATH"
+            ls -laR "$PASIM_DIR" || true
+            exit 1
+          fi
           chmod +x "$PASIM_PATH"
-          
+
           # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$(pwd)/llvm-project/patmos-tools" || true
+            ls -laR "$PASIM_DIR" || true
             exit 1
           fi
-          
+
           # Add to PATH and environment
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
@@ -374,7 +379,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: patmos-simulator-tools
-          path: llvm-project/patmos-tools
+          path: llvm-project
 
       - name: Debug artifact after download
         run: |
@@ -384,20 +389,25 @@ jobs:
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use the downloaded artifact path
-          PASIM_PATH="$(pwd)/patmos-tools/bin/pasim"
-          PASIM_DIR="$(pwd)/patmos-tools"
-          
-          # Ensure pasim is executable
+          # Use absolute paths to avoid working directory confusion
+          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
+          PASIM_DIR="$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+
+          # Check file existence before chmod
+          if [ ! -f "$PASIM_PATH" ]; then
+            echo "::error::pasim not found at $PASIM_PATH"
+            ls -laR "$PASIM_DIR" || true
+            exit 1
+          fi
           chmod +x "$PASIM_PATH"
-          
+
           # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$(pwd)/llvm-project/patmos-tools" || true
+            ls -laR "$PASIM_DIR" || true
             exit 1
           fi
-          
+
           # Add to PATH and environment
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
@@ -498,7 +508,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: patmos-simulator-tools
-          path: llvm-project/patmos-tools
+          path: llvm-project
 
       - name: Debug artifact after download
         run: |
@@ -508,20 +518,25 @@ jobs:
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use the downloaded artifact path
-          PASIM_PATH="$(pwd)/patmos-tools/bin/pasim"
-          PASIM_DIR="$(pwd)/patmos-tools"
-          
-          # Ensure pasim is executable
+          # Use absolute paths to avoid working directory confusion
+          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
+          PASIM_DIR="$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+
+          # Check file existence before chmod
+          if [ ! -f "$PASIM_PATH" ]; then
+            echo "::error::pasim not found at $PASIM_PATH"
+            ls -laR "$PASIM_DIR" || true
+            exit 1
+          fi
           chmod +x "$PASIM_PATH"
-          
+
           # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$(pwd)/llvm-project/patmos-tools" || true
+            ls -laR "$PASIM_DIR" || true
             exit 1
           fi
-          
+
           # Add to PATH and environment
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
@@ -612,7 +627,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: patmos-simulator-tools
-          path: llvm-project/patmos-tools
+          path: llvm-project
 
       - name: Debug artifact after download
         run: |
@@ -622,20 +637,25 @@ jobs:
         working-directory: llvm-project
         run: |
           set -euo pipefail
-          # Use the downloaded artifact path
-          PASIM_PATH="$(pwd)/patmos-tools/bin/pasim"
-          PASIM_DIR="$(pwd)/patmos-tools"
-          
-          # Ensure pasim is executable
+          # Use absolute paths to avoid working directory confusion
+          PASIM_PATH="$GITHUB_WORKSPACE/llvm-project/patmos-tools/bin/pasim"
+          PASIM_DIR="$GITHUB_WORKSPACE/llvm-project/patmos-tools"
+
+          # Check file existence before chmod
+          if [ ! -f "$PASIM_PATH" ]; then
+            echo "::error::pasim not found at $PASIM_PATH"
+            ls -laR "$PASIM_DIR" || true
+            exit 1
+          fi
           chmod +x "$PASIM_PATH"
-          
+
           # Validate pasim exists and is executable
           if [ ! -x "$PASIM_PATH" ]; then
             echo "::error::pasim not found or not executable at $PASIM_PATH"
-            ls -laR "$(pwd)/llvm-project/patmos-tools" || true
+            ls -laR "$PASIM_DIR" || true
             exit 1
           fi
-          
+
           # Add to PATH and environment
           echo "$PASIM_DIR" >> "$GITHUB_PATH"
           echo "PATMOS_PASIM=$PASIM_PATH" >> "$GITHUB_ENV"
