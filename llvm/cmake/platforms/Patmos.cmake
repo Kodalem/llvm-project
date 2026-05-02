@@ -24,8 +24,9 @@ endif()
 
 message(STATUS "Machine Triple: ${DUMP_MACHINE}")
 
-# Set Clang resource version dynamically based on LLVM version
-set(CLANG_RESOURCE_VERSION "${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}")
+# Set Clang resource version dynamically based on LLVM version.
+# Since LLVM 16 the resource dir is lib/clang/{MAJOR}/ (no minor/patch).
+set(CLANG_RESOURCE_VERSION "${LLVM_VERSION_MAJOR}")
 if ("${DUMP_MACHINE}" MATCHES "x86_64.*linux-gnu")
 	# Accept variants like x86_64-unknown-linux-gnu (common in Nix) as well
 	set( TARGET_TRIPLE "x86_64-linux-gnu")

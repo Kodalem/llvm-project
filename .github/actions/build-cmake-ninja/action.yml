@@ -319,7 +319,7 @@ runs:
         
         if [ -n "$CLANG_BINARY" ]; then
           # Extract major version from clang --version output
-          CLANG_VERSION=$($CLANG_BINARY --version | grep -oP "(?<=version )[\d.]+" | cut -d. -f1)
+          CLANG_VERSION=$($CLANG_BINARY --version | sed -n 's/.*version \([0-9]*\).*/\1/p' | head -1)
           
           # Create symlink clang-{MAJOR} if it doesn't exist
           if [ -n "$CLANG_VERSION" ]; then
