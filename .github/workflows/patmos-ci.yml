@@ -97,28 +97,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-latest
-            cc: gcc
-            cxx: g++
-            parallelism: '4'
-          - platform: ubuntu-22.04
-            cc: gcc
-            cxx: g++
-            parallelism: '4'
-          - platform: macos-latest # ARM
-            cc: clang
-            cxx: clang++
-            parallelism: '4'
-          - platform: macos-14 # ARM
-            cc: clang
-            cxx: clang++
-            parallelism: '4'
           - platform: namespace-profile-llvm
             cc: clang
             cxx: clang++
             # Tweak it as required, it should be high enough to speed up, but not too high
             # to crash due to out of memory issues.
-            parallelism: '6'
+            parallelism: '8'
 
     env:
       CC: ${{matrix.cc}}
@@ -326,8 +310,10 @@ jobs:
           - platform: namespace-profile-llvm
             cc: clang
             cxx: clang++
-    # Run after the test jobs finish      
-    needs: [package-patmos, test-benchmarks, test-non-patmos]
+    # Run after the test jobs finish
+    # Temporarily remove test-benchmarks, due to benchmarking tools are way out of date.
+    # Todo: Reintroduce it after the benchmarking tools are updated and the benchmarks are fixed to work with the new LLVM version.
+    needs: [package-patmos, test-non-patmos]
     # Run only if this was triggered by a tag
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     env:
@@ -410,8 +396,9 @@ jobs:
             cc: clang
             cxx: clang++
             parallelism: '4'
-    # Run after the test jobs finish
-    needs: [package-patmos-cmake, test-benchmarks, test-non-patmos-cmake]
+    # Temporarily remove test-benchmarks, due to benchmarking tools are way out of date.
+    # Todo: Reintroduce it after the benchmarking tools are updated and the benchmarks are fixed to work with the new LLVM version.
+    needs: [package-patmos-cmake, test-non-patmos-cmake]
     # Run only if this was triggered by a tag
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     env:

@@ -51,11 +51,9 @@ env:
   LLD_PATH: lld
   INSTALL_PATH: install
   CET_TESTS_PATH: patmos-cet-test-suite
-  # Then define composite paths
-  GITHUB_WORKSPACE: ${{ github.workspace }}
-  BUILD_PATH: ${{ env.GITHUB_WORKSPACE }}/${{ env.LLVM_PATH }}/build
-  COMPILER_RT_BUILD_PATH: ${{ env.GITHUB_WORKSPACE }}/${{ env.COMPILER_RT_PATH }}/build
-  NEWLIB_BUILD_PATH: ${{ env.GITHUB_WORKSPACE }}/${{ env.NEWLIB_PATH }}/build
+  BUILD_PATH: llvm/build
+  COMPILER_RT_BUILD_PATH: compiler-rt/build
+  NEWLIB_BUILD_PATH: newlib/build
 
 
 
@@ -68,7 +66,7 @@ runs:
       if: inputs.enable-package == 'true'
       shell: bash
       run: |
-        echo "GITHUB_WORKSPACE: ${{ env.GITHUB_WORKSPACE }}"
+        echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
         echo "LLVM_PATH: ${{ env.LLVM_PATH }}"
         echo "BUILD_PATH: ${{ env.BUILD_PATH }}"
         cd "${{ env.BUILD_PATH }}" && \
