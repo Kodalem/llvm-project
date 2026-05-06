@@ -6,7 +6,6 @@
   self = rec {
     llvm = import ./llvm {
       inherit pkgs system;
-      packages = self.packages;
       simulator = self.simulator.packages.patmos-simulator;
     };
     simulator = import ./simulator {inherit pkgs system;};

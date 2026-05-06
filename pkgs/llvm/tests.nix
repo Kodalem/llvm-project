@@ -1,6 +1,7 @@
 {
   pkgs,
   system,
+  packages,
   patmos-llvm,
   patmos-simulator,
 }: {

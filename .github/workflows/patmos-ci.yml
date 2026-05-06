@@ -311,7 +311,7 @@ jobs:
           name: patmos-llvm
           # If you chose API tokens for write access OR if you have a private cache
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
-      - run: nix flake check
+      - run: nix flake show --show-trace --accept-flake-config
       - run: nix build -L --show-trace --no-link --print-out-paths | cachix push patmos-llvm
 
 

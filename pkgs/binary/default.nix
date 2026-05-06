@@ -4,6 +4,7 @@
   patmos-toolchain-src,
 }: let
   # Fill these when channel artifacts are published.
+  # Todo Remove them now after we use Cachix for binary caching?
   channelArtifacts = {
     release = {
       url = null;

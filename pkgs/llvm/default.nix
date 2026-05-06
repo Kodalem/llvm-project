@@ -1,7 +1,6 @@
 {
   pkgs,
   system,
-  packages,
   simulator,
 }: let
   repoSrc = ../..;
@@ -60,7 +59,7 @@
     ln -s ${pkgs.mold}/bin/mold $PWD/bin/lld
     ln -s ${pkgs.mold}/bin/mold $PWD/bin/ld
   '';
-in {
+in rec {
   packages.patmos-llvm = pkgs.clangStdenv.mkDerivation rec {
     name = "patmos-llvm-${system}";
     src = filteredRepoSrc;
