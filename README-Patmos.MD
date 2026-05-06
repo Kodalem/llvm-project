@@ -39,6 +39,11 @@ Use `patmos-*` commands (`patmos-clang`, `patmos-llc`, `patmos-llvm-objdump`, ..
 ```zsh
 # Default channel (currently release wrapper; falls back to source if artifact metadata is not set)
 nix shell -p github:Kodalem/llvm-project/patmos-llvm-22x-rusty#patmos-prefixed
+
+# If you are already from the repo
+nix develop
+
+# Check that it works
 patmos-clang --version
 ```
 

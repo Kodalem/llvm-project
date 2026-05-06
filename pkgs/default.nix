@@ -57,7 +57,7 @@ in {
   checks = {
     patmos-llvm-tests = self.llvm.checks.patmos-llvm-tests;
   };
-  devShells = {
+  devShells = rec {
     default = (pkgs.mkShell.override {stdenv = pkgs.clangStdenv;}) {
       buildInputs = [
         self.prefixed.packages.patmos-prefixed
@@ -97,5 +97,10 @@ in {
         export CXX="patmos-clang++"
       '';
     };
+
+    # Friendly aliases: align `nix develop` attrs with exported package names.
+    "patmos-prefixed" = default;
+    "patmos-prefixed-release" = release;
+    "patmos-prefixed-src" = src;
   };
 }
