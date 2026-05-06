@@ -57,7 +57,7 @@ nix develop github:Kodalem/llvm-project/patmos-llvm-22x-rusty
 patmos-clang -O2 -c fibonacci-test.cpp -o fibonacci-test.o
 ```
 
-### Persistent install
+### Persistent install (AT YER OWN RISK)
 
 ```zsh
 nix profile install github:Kodalem/llvm-project/patmos-llvm-22x-rusty#patmos-prefixed
