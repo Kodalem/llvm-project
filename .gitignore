@@ -97,3 +97,14 @@ pythonenv*
 /llvm/lib/Target/Patmos/PatmosGenSubtargetInfo.inc
 /llvm/lib/Target/Patmos/PatmosGenMCCodeEmitter.inc
 /llvm/lib/Target/Patmos/PatmosGenDFAPacketizer.inc
+
+# Devenv
+.devenv*
+devenv.local.nix
+devenv.local.yaml
+
+# direnv
+.direnv
+
+# pre-commit
+.pre-commit-config.yaml

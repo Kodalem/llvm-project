@@ -1,73 +1,48 @@
 {
-  description = "Patmos LLVM build tester flake thingy, it is 2337 and I am going insaneeeeeee";
+  description = "Patmos LLVM Project - Modular Flakes";
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = import nixpkgs { inherit system; };
-        buildInputs = with pkgs; [
-          cmake
-          ninja
-          git
-          gcc
-          binutils
-          python3
-          pkg-config
-          libxml2
-        ] ++ pkgs.lib.optional (system == "x86_64-darwin") pkgs.darwin.cctools;
-      in {
-        packages = let
-          patmos-llvm = pkgs.stdenv.mkDerivation {
-            name = "patmos-llvm";
-            src = ./.;
-            buildInputs = buildInputs;
-            nativeBuildInputs = buildInputs;
-            configurePhase = ''
-              # Configure out-of-source to a deterministic 'build' directory
-              cmake -S llvm -B build \
-                -DCMAKE_BUILD_TYPE=Debug \
-                -DLLVM_TARGETS_TO_BUILD=Patmos \
-                -DLLVM_DEFAULT_TARGET_TRIPLE=patmos-unknown-unknown-elf \
-                -DLLVM_ENABLE_PROJECTS="clang;lld" \
-                -DCLANG_ENABLE_OBJC_REWRITER=false \
-                -DCLANG_ENABLE_STATIC_ANALYZER=false \
-                -DCLANG_BUILD_EXAMPLES=false \
-                -DLLVM_ENABLE_BINDINGS=false \
-                -DLLVM_INSTALL_BINUTILS_SYMLINKS=false \
-                -DLLVM_INSTALL_CCTOOLS_SYMLINKS=false \
-                -DLLVM_INCLUDE_EXAMPLES=false \
-                -DLLVM_INCLUDE_BENCHMARKS=false \
-                -DLLVM_APPEND_VC_REV=false \
-                -DLLVM_ENABLE_WARNINGS=false \
-                -DLLVM_ENABLE_PEDANTIC=false \
-                -DLLVM_ENABLE_LIBPFM=false \
-                -DLLVM_BUILD_INSTRUMENTED_COVERAGE=false \
-                -DLLVM_INSTALL_UTILS=false
-            '';
-            buildPhase = ''
-              # Use cmake --build for portability between generators (ninja/make)
-              cmake --build build -- -j$NIX_BUILD_CORES
-            '';
-            installPhase = ''
-              mkdir -p $out
-              cp -r build/* $out/
-            '';
-          };
-        in {
-          patmos-llvm = patmos-llvm;
-          default = patmos-llvm;
-        };
+  nixConfig = {
+    extra-substituters = "https://nix-community.cachix.org";
+    extra-trusted-public-keys = "patmos-llvm.cachix.org-1:7xiUm7SvEZ66fS1aS+ZtVRyWzEB2XRfaSR7KtmuUlPA=";
+  };
 
-        devShells = {
-          default = pkgs.mkShell {
-            buildInputs = buildInputs;
-            shellHook = ''
-              echo "Patmos LLVM dev environment"
-            '';
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
+  }:
+    flake-utils.lib.eachDefaultSystem (
+      system: let
+        pkgs = import nixpkgs {inherit system;};
+        packages = import ./pkgs {inherit pkgs system;};
+      in {
+        packages = packages.packages;
+        checks = packages.checks;
+        devShells = packages.devShells;
+        apps = {
+          patmos-clang = {
+            type = "app";
+            program = "${packages.packages.patmos-prefixed}/bin/patmos-clang";
+          };
+          patmos-clang-release = {
+            type = "app";
+            program = "${packages.packages.patmos-prefixed-release}/bin/patmos-clang";
+          };
+          patmos-clang-src = {
+            type = "app";
+            program = "${packages.packages.patmos-prefixed-src}/bin/patmos-clang";
+          };
+          patmos-llc = {
+            type = "app";
+            program = "${packages.packages.patmos-prefixed}/bin/patmos-llc";
+          };
+          default = {
+            type = "app";
+            program = "${packages.packages.patmos-prefixed}/bin/patmos-clang";
           };
         };
       }

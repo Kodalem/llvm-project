@@ -3,6 +3,14 @@ Patmos LLVM
 
 This is a fork of the LLVM Project that adds a target for the Patmos Architecture.
 
+# Installation (Fast way)
+
+Install nix or lix, and then run the following command in your terminal:
+
+```zsh
+nix develop github:Kodalem/llvm-project/patmos-llvm-22x-rusty
+```
+
 # Installation
 
 Prebuilt releases are [published on Github](https://github.com/t-crest/patmos-llvm-project/releases) as `.tar.gz` files.
@@ -15,6 +23,41 @@ tar -xvf <tarfile>
 
 This will correctly install all artifacts into the right paths. You are now ready to use the compiler.
 Remember to set your `PATH` to point to `t-crest/local/bin`.
+
+
+## Nix Usage (Prefixed Tools)
+
+The flake exports Patmos-specific wrappers so your host LLVM/Clang is not overridden.
+Use `patmos-*` commands (`patmos-clang`, `patmos-llc`, `patmos-llvm-objdump`, ...).
+
+### Channels
+
+- `patmos-prefixed` (default): release channel wrapper.
+
+### Quick shell usage
+
+```zsh
+# Default channel (currently release wrapper; falls back to source if artifact metadata is not set)
+nix shell -p github:Kodalem/llvm-project/patmos-llvm-22x-rusty#patmos-prefixed
+patmos-clang --version
+```
+
+### Dev shells
+
+```zsh
+# Default dev shell (release wrapper)
+nix develop github:Kodalem/llvm-project/patmos-llvm-22x-rusty
+
+# Example compile command
+patmos-clang -O2 -c fibonacci-test.cpp -o fibonacci-test.o
+```
+
+### Persistent install
+
+```zsh
+nix profile install github:Kodalem/llvm-project/patmos-llvm-22x-rusty#patmos-prefixed
+patmos-clang --version
+```
 
 
 # Development
@@ -318,3 +361,53 @@ LLVM Requiring stricter physical register live-li-ness and stronger typed callin
 is going to be the eeeeeend of meeeeeeee.
 
 /Users/christineek/CLionProjects/patmos-llvm-project/llvm/test/CodeGen/Patmos/programs/bounded/single_source/instruction_combinations/trunc_to_br_condition.ll
+
+Sanity reminder
+```zsh
+# Build it
+nix build .#patmos-newlib -L 
+# Copy it 
+nix copy --to file:///Volumes/T7/nix-cache .#patmos-newlib
+# Collect it
+nix-collect-garbage -d
+# Restore it
+nix copy --from file:///Volumes/T7/nix-cache .#patmos-newlib
+# Break it *enter Daft Punk riff here*
+```
+
+Bless the Omnissiah for the following method to eliminate derivation being over sensitive
+```nix
+let
+  repoSrc = ../..;
+
+  # Keep source hashing stable by excluding local build outputs.
+  filteredRepoSrc = pkgs.lib.cleanSourceWith {
+    src = repoSrc;
+    filter = path: _type:
+      let
+        relPath = pkgs.lib.removePrefix "${toString repoSrc}/" (toString path);
+        ignored =
+          relPath == ".git"
+          || pkgs.lib.hasPrefix ".git/" relPath
+          || relPath == "build"
+          || pkgs.lib.hasPrefix "build/" relPath
+          || relPath == "build-compiler-rt"
+          || pkgs.lib.hasPrefix "build-compiler-rt/" relPath
+          || relPath == "build-newlib"
+          || pkgs.lib.hasPrefix "build-newlib/" relPath
+          || relPath == "result"
+          || pkgs.lib.hasPrefix "result/" relPath
+          || pkgs.lib.hasSuffix ".log" relPath;
+      in
+        !ignored;
+  };
+```
+
+Uploading it to cachix manually
+```zsh
+nix build .#patmos-prefixed -L --show-trace --no-link --print-out-paths | cachix push kodalem
+# Do not forget to copy the signing key, because they do not support multiple keys in multiple caches.
+```
+
+
+Maintenance - be sure to update the secrets in the github repository if a new cache signing key from cachix, and check the CI file as well in the workflow
