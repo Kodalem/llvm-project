@@ -306,6 +306,25 @@ runs:
         $GITHUB_WORKSPACE/$NEWLIB_PATH/configure --target=patmos-unknown-unknown-elf AR_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/llvm-ar" CC_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/clang" CFLAGS_FOR_TARGET="-target patmos-unknown-unknown-elf -O2 -emit-llvm -Wno-error -Wno-error=deprecated-non-prototype -Wno-error=invalid-noreturn -D__GLIBC_USE\(...\)=0 -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types" RANLIB_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/llvm-ranlib" LD_FOR_TARGET="$GITHUB_WORKSPACE/$BUILD_PATH/bin/clang"
         make
 
+    - name: Discover Patmos Runtime Artifacts Location
+      if: (inputs.enable-package == 'true') && (inputs.enable-tests == 'true') && startsWith(inputs.default-target, 'patmos')
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # Use libc.a as the anchor for the runtime lib directory.
+        LIBC_PATH="$(find "$GITHUB_WORKSPACE/$NEWLIB_BUILD_PATH" -name libc.a -print -quit)"
+        if [ -z "$LIBC_PATH" ]; then
+          echo "ERROR: libc.a not found after building Newlib"
+          echo "Searched under: $GITHUB_WORKSPACE/$NEWLIB_BUILD_PATH"
+          find "$GITHUB_WORKSPACE/$NEWLIB_BUILD_PATH" -name 'crt0.o' -o -name 'libc.a' -o -name 'libm.a' 2>/dev/null | head -20 || true
+          exit 1
+        fi
+        PATMOS_LIB_DIR="$(dirname "$LIBC_PATH")"
+        echo "Found Patmos runtime at: $PATMOS_LIB_DIR"
+        echo "PATMOS_LIB_DIR=$PATMOS_LIB_DIR" >> "$GITHUB_ENV"
+        ls -la "$PATMOS_LIB_DIR" | head -200
+
     - name: Build Patmos Clang Driver Test Dependencies
       if: (inputs.enable-tests == 'true') && startsWith(inputs.default-target, 'patmos')
       shell: bash
@@ -319,7 +338,11 @@ runs:
       if: (inputs.enable-tests == 'true') && startsWith(inputs.default-target, 'patmos')
       shell: bash
       run: |
-        PATMOS_LIB_DIR="$GITHUB_WORKSPACE/$BUILD_PATH/patmos-unknown-unknown-elf/lib"
+        if [ -z "$PATMOS_LIB_DIR" ]; then
+          echo "ERROR: PATMOS_LIB_DIR not set (should have been discovered after Newlib build)"
+          exit 1
+        fi
+        echo "Verifying runtime artifacts at: $PATMOS_LIB_DIR"
         ls -l "$PATMOS_LIB_DIR"
 
         for f in crt0.o crtbegin.o crtend.o libc.a libm.a libpatmos.a libsyms.o librt.a; do
@@ -385,6 +408,21 @@ runs:
         PARALLELISM: ${{ inputs.parallelism }}
       run: ninja -j $PARALLELISM PatmosPackage
 
+    # Optionally unpack packaged binaries for convenience, but rely on PATMOS_LIB_DIR
+    # (discovered from Newlib output) for runtime artifacts, not the tarball.
+    - name: Install Packaged Binaries (for convenience)
+      if: (inputs.enable-package == 'true') && (inputs.enable-tests == 'true')
+      working-directory: ${{ env.BUILD_PATH }}
+      shell: bash
+      run: |
+        TARBALL=$(find . -name 'patmos-llvm-*.tar.gz' | head -1)
+        if [ -n "$TARBALL" ]; then
+          echo "Unpacking compiler binaries from $TARBALL"
+          tar -xvf "$TARBALL" -C "$GITHUB_WORKSPACE/$INSTALL_PATH"
+        else
+          echo "No tarball found; skipping unpack"
+        fi
+
     - name: Upload Package Artifact
       if: always() && inputs.enable-package == 'true'
       uses: actions/upload-artifact@v4
@@ -409,5 +447,8 @@ runs:
       working-directory: ${{env.CET_TESTS_PATH}}
       shell: bash
       run: |
+        echo "PATMOS_LIB_DIR=${PATMOS_LIB_DIR:-<unset>}"
+        which patmos-clang
+        patmos-clang --version
         $GITHUB_WORKSPACE/$BUILD_PATH/bin/llvm-lit . -v --filter="^(?!((.*/dijkstra.c)|(.*/gsm_dec.c)|(.*/huff_dec.c)|(.*/st.c)|(.*/minver.c)|(.*/cosf.c))).*"
 

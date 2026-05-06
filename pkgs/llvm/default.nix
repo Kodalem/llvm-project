@@ -119,9 +119,9 @@ in rec {
     buildPhase = ''
       export CCACHE_MAXSIZE=${CCACHE_MAXSIZE}
       export CCACHE_COMPRESS=${CCACHE_COMPRESS}
-      cmake --build build --parallel 16
+      cmake --build build --parallel 22
       # Generate TableGen files
-      cmake --build build --target llvm-tblgen --parallel 12
+      cmake --build build --target llvm-tblgen --parallel 22
       build/bin/llvm-tblgen -gen-instr-info -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenInstrInfo.inc
       build/bin/llvm-tblgen -gen-register-info -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenRegisterInfo.inc
       cp build/lib/Target/Patmos/PatmosGenRegisterInfo* llvm/lib/Target/Patmos/
