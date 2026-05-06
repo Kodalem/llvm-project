@@ -15,6 +15,12 @@
         relPath
         == ".git"
         || pkgs.lib.hasPrefix ".git/" relPath
+        || relPath == ".github"
+        || pkgs.lib.hasPrefix ".github/" relPath
+        || relPath == ".ci"
+        || pkgs.lib.hasPrefix ".ci/" relPath
+        || relPath == ".forgejo"
+        || pkgs.lib.hasPrefix ".forgejo/" relPath
         || relPath == "build"
         || pkgs.lib.hasPrefix "build/" relPath
         || relPath == "build-compiler-rt"
@@ -23,6 +29,7 @@
         || pkgs.lib.hasPrefix "build-newlib/" relPath
         || relPath == "result"
         || pkgs.lib.hasPrefix "result/" relPath
+        || (builtins.match "[^/]+\\.md" relPath) != null
         || pkgs.lib.hasSuffix ".log" relPath;
     in
       !ignored;

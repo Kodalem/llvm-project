@@ -6,7 +6,7 @@
   };
 
   nixConfig = {
-    extra-substituters = "https://nix-community.cachix.org";
+    extra-substituters = "https://patmos-llvm.cachix.org";
     extra-trusted-public-keys = "patmos-llvm.cachix.org-1:7xiUm7SvEZ66fS1aS+ZtVRyWzEB2XRfaSR7KtmuUlPA=";
   };
 

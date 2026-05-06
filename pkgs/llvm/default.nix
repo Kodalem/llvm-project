@@ -14,6 +14,12 @@
         relPath
         == ".git"
         || pkgs.lib.hasPrefix ".git/" relPath
+        || relPath == ".github"
+        || pkgs.lib.hasPrefix ".github/" relPath
+        || relPath == ".ci"
+        || pkgs.lib.hasPrefix ".ci/" relPath
+        || relPath == ".forgejo"
+        || pkgs.lib.hasPrefix ".forgejo/" relPath
         || relPath == "build"
         || pkgs.lib.hasPrefix "build/" relPath
         || relPath == "build-compiler-rt"
@@ -22,6 +28,7 @@
         || pkgs.lib.hasPrefix "build-newlib/" relPath
         || relPath == "result"
         || pkgs.lib.hasPrefix "result/" relPath
+        || (builtins.match "[^/]+\\.md" relPath) != null
         || pkgs.lib.hasSuffix ".log" relPath;
     in
       !ignored;
@@ -119,9 +126,9 @@ in rec {
     buildPhase = ''
       export CCACHE_MAXSIZE=${CCACHE_MAXSIZE}
       export CCACHE_COMPRESS=${CCACHE_COMPRESS}
-      cmake --build build --parallel 22
+      cmake --build build --parallel 4
       # Generate TableGen files
-      cmake --build build --target llvm-tblgen --parallel 22
+      cmake --build build --target llvm-tblgen --parallel 4
       build/bin/llvm-tblgen -gen-instr-info -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenInstrInfo.inc
       build/bin/llvm-tblgen -gen-register-info -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenRegisterInfo.inc
       cp build/lib/Target/Patmos/PatmosGenRegisterInfo* llvm/lib/Target/Patmos/

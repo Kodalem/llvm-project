@@ -1,0 +1,133 @@
+name: Patmos CI Nix
+
+on:
+  push:
+    branches: '**'
+    paths-ignore:
+      # Ignore Markdown file changes, as they are just docs
+      # You can add more if you want, just be careful
+      - '**.md'
+  pull_request:
+  schedule:
+    # Run every monday at 1:00 AM
+    - cron: '00 1 * * MON'
+
+jobs:
+  # Probe once: evaluate per-platform drvPath and check whether cache already has it.
+  check-flake:
+    runs-on: ubuntu-latest
+    outputs:
+      results: ${{ steps.probe.outputs.results }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31.10.6
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Configure Cachix (optional read/write auth)
+        uses: cachix/cachix-action@v17
+        with:
+          name: patmos-llvm
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN || '' }}
+
+      - name: Check flake derivations in cache
+        id: probe
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Map runner labels to flake systems.
+          declare -a pairs=(
+            "ubuntu-latest:x86_64-linux"
+            "macos-latest:aarch64-darwin"
+          )
+
+          declare -A res
+
+          for p in "${pairs[@]}"; do
+            platform="${p%%:*}"
+            system="${p##*:}"
+
+            echo "Evaluating flake outPath for platform=$platform system=$system..."
+            if ! out=$(nix eval --raw ".#packages.${system}.\"patmos-prefixed\".outPath" 2>/dev/null); then
+              echo "  -> outPath eval failed for ${system}"
+              res[$platform]="err"
+              continue
+            fi
+
+            echo "  -> outPath: $out"
+            hash=$(basename "$out" | cut -d- -f1)
+            narinfo_url="https://patmos-llvm.cachix.org/${hash}.narinfo"
+
+            # Fast path: query narinfo without downloading store paths.
+            if curl --head --silent --fail "$narinfo_url" >/dev/null 2>&1; then
+              echo "  -> cache HIT (narinfo) for $platform"
+              res[$platform]="hit"
+            else
+              # Fallback path: handles auth/private-cache and non-standard HTTP failures.
+              if nix copy --to "https://patmos-llvm.cachix.org" "$out" >/dev/null 2>&1; then
+                echo "  -> cache HIT (nix copy fallback) for $platform"
+                res[$platform]="hit"
+              else
+                echo "  -> cache MISS for $platform"
+                res[$platform]="miss"
+              fi
+            fi
+          done
+
+          json="{"
+          first=1
+          for k in "${!res[@]}"; do
+            if [ $first -eq 1 ]; then
+              json="$json\"$k\":\"${res[$k]}\""
+              first=0
+            else
+              json="$json,\"$k\":\"${res[$k]}\""
+            fi
+          done
+          json="$json}"
+          echo "results=$json" >> "$GITHUB_OUTPUT"
+  
+
+  # Build/push only when probe reports cache miss/error for that platform.
+  # https://nix.dev/guides/recipes/continuous-integration-github-actions
+  cachix:
+    needs: check-flake
+    runs-on: ${{ matrix.platform }}
+    if: ${{ fromJson(needs.check-flake.outputs.results)[matrix.platform] != 'hit' }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: ubuntu-latest
+            system: x86_64-linux
+            cc: clang
+            cxx: clang++
+          - platform: macos-latest
+            system: aarch64-darwin
+            cc: clang
+            cxx: clang++
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: cachix/install-nix-action@v31.10.6
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+      - uses: cachix/cachix-action@v17
+        with:
+          name: patmos-llvm
+          # If you chose API tokens for write access OR if you have a private cache
+          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+      - run: nix flake show --show-trace --accept-flake-config
+      - run: nix build -L --show-trace --no-link --print-out-paths | cachix push patmos-llvm
+
+
+
