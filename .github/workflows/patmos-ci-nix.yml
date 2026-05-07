@@ -42,7 +42,7 @@ jobs:
           # If you chose API tokens for write access OR if you have a private cache
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
       - run: nix flake show --show-trace --accept-flake-config
-      - run: nix eval --raw github:Kodalem/llvm-project/patmos-llvm-22x-rusty#packages.x86_64-linux.patmos-prefixed.outPath --accept-flake-config
+      - run: nix eval --raw github:Kodalem/llvm-project/patmos-llvm-22x-rusty#patmos-prefixed --accept-flake-config
       - run: nix build --no-link --print-out-paths github:Kodalem/llvm-project/patmos-llvm-22x-rusty#patmos-prefixed | cachix push patmos-llvm
 
 
