@@ -8,8 +8,10 @@ This is a fork of the LLVM Project that adds a target for the Patmos Architectur
 Install nix or lix, and then run the following command in your terminal:
 
 ```zsh
-nix develop github:Kodalem/llvm-project/patmos-llvm-22x-rusty
+sudo nix develop github:Kodalem/llvm-project/patmos-llvm-22x-rusty --accept-flake-config
 ```
+
+Nope, you cannot *not* `sudo`, you cannot *not* `--accept-flake-config`, otherwise you will suffer the pain of being installing the compiler for 2 hours.
 
 # Installation
 
