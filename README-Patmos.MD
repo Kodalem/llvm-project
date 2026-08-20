@@ -11,7 +11,7 @@ Install nix or lix, and then run the following command in your terminal:
 sudo nix develop github:Kodalem/llvm-project/patmos-llvm-22x-rusty --accept-flake-config
 ```
 
-Nope, you cannot *not* `sudo`, you cannot *not* `--accept-flake-config`, otherwise you will suffer the pain of being installing the compiler for 2 hours.
+Nope, you cannot _not_ `sudo`, you cannot _not_ `--accept-flake-config`, otherwise you will suffer the pain of being installing the compiler for 2 hours.
 
 # Installation
 
@@ -25,7 +25,6 @@ tar -xvf <tarfile>
 
 This will correctly install all artifacts into the right paths. You are now ready to use the compiler.
 Remember to set your `PATH` to point to `t-crest/local/bin`.
-
 
 ## Nix Usage (Prefixed Tools)
 
@@ -65,7 +64,6 @@ patmos-clang -O2 -c fibonacci-test.cpp -o fibonacci-test.o
 nix profile install github:Kodalem/llvm-project/patmos-llvm-22x-rusty#patmos-prefixed
 patmos-clang --version
 ```
-
 
 # Development
 
@@ -111,7 +109,7 @@ Then you must create a build folder.
 This folder doesn't have to be in the LLVM Project root folder, but that is where we will put it in this example.
 In this folder, you must setup the build with `cmake` (referencing the LLVM subfolder), after which you can build:
 
-```
+```zsh
 mkdir -p build
 cd build
 cmake ../llvm -DCMAKE_BUILD_TYPE=Debug -DLLVM_TARGETS_TO_BUILD="Patmos" -DLLVM_DEFAULT_TARGET_TRIPLE=patmos-unknown-unknown-elf -DLLVM_ENABLE_PROJECTS="clang;lld" -DCLANG_ENABLE_ARCMT=false -DCLANG_ENABLE_STATIC_ANALYZER=false -DCLANG_BUILD_EXAMPLES=false -DLLVM_ENABLE_BINDINGS=false -DLLVM_INSTALL_BINUTILS_SYMLINKS=false -DLLVM_INSTALL_CCTOOLS_SYMLINKS=false -DLLVM_INCLUDE_EXAMPLES=false -DLLVM_INCLUDE_BENCHMARKS=false -DLLVM_APPEND_VC_REV=false -DLLVM_ENABLE_WARNINGS=false -DLLVM_ENABLE_PEDANTIC=false -DLLVM_ENABLE_LIBPFM=false -DLLVM_BUILD_INSTRUMENTED_COVERAGE=false -DLLVM_INSTALL_UTILS=false
@@ -127,6 +125,8 @@ cmake ../compiler-rt/ -DCMAKE_TOOLCHAIN_FILE=../compiler-rt/cmake/patmos-clang-t
 make -j
 ```
 
+YOU CANNOT SKIP BUILDING COMPILER-RT BECAUSE OTHERWISE THE TWO .O files WILL BE MISSING!!!
+
 If you need to build the standard library (newlib):
 
 ```zsh
@@ -136,6 +136,7 @@ cd build-newlib
 ../patmos-newlib/configure --target=patmos-unknown-unknown-elf AR_FOR_TARGET="$(pwd)/../build/bin/llvm-ar" CC_FOR_TARGET="$(pwd)/../build/bin/clang" CFLAGS_FOR_TARGET="-target patmos-unknown-unknown-elf -O2 -emit-llvm -Wno-error -Wno-error=deprecated-non-prototype -Wno-error=invalid-noreturn -D__GLIBC_USE\(...\)=0 -Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types" RANLIB_FOR_TARGET="$(pwd)/../build/bin/llvm-ranlib" LD_FOR_TARGET="$(pwd)/../build/bin/clang"
 make
 ```
+
 This compiles std into bitcode files, such that they are ready to publish with the compiler.
 
 ### Test
@@ -179,7 +180,7 @@ To do this, you must have built LLVM, Compiler-RT, and `newlib` using the previo
 The tarball is then available under `build/patmos-unknown-unknown-elf/package-temp/patmos-llvm-*.tar.gz`, where `*` depends on the platform you are building on.
 Using this tarball, you can install the compiler as described in the installation section.
 
-_Note: The steps for building LLVM are meant for development and as such produce a debug-mode compiler (which is extremely slow). 
+_Note: The steps for building LLVM are meant for development and as such produce a debug-mode compiler (which is extremely slow).
 To package a release compiler, use the flag `-DCMAKE_BUILD_TYPE=Release`_
 
 ### Releasing New Versions
@@ -189,14 +190,14 @@ Github Actions will then automatically test the commit, make packages for each p
 
 ### <a name="anch-updating-llvm"></a>Updating LLVM
 
-Even though this repository is a fork of [the official LLVM repository](https://github.com/llvm/llvm-project), 
+Even though this repository is a fork of [the official LLVM repository](https://github.com/llvm/llvm-project),
 we only pull the upstream changes at official release tags.
 The `upstream` branch is specifically intended for this and nothing else.
 Its `HEAD` should always be a commit for an official release.
 E.g. it could be tracking the commit for the 11.1.0 release.
 
 Updating to a new release of upstream LLVM is not a trivial task.
-The main difficulty comes from the fact that LLVM uses release branches, whic means their history splits after a major release. 
+The main difficulty comes from the fact that LLVM uses release branches, whic means their history splits after a major release.
 This means trying to simply pull in the latest release tag will likely cause many merge conflicts in LLVM code that we (the Patmos project) haven't touched.
 Trying to fix the merge conflict can be tedious and error prone.
 Instead, the following guide will mimick mergin by simply applying Patmos' code directly to the new release.
@@ -208,49 +209,56 @@ _`t-crest` refers to the Patmos LLVM github repo: github.com/t-crest/patmos-llvm
 
 _As an example, `llvmorg-11.1.0` is the current LLVM version tag used by Patmos, and `llvmorg-12.0.1` is the one we are trying to update to. Change them as appropriate_
 
-* Get the most recent LLVM release's tag: 
+- Get the most recent LLVM release's tag:
+
 ```sh
 git checkout master
 git pull llvm-upstream --tags
 ```
 
-* Update the `upstream` branch to point to it: 
+- Update the `upstream` branch to point to it:
+
 ```sh
 git branch -f upstream llvmorg-12.0.1
 ```
 
-* Push the new tag and "upstream" to the t-crest repo:
+- Push the new tag and "upstream" to the t-crest repo:
+
 ```sh
 git checkout upstream
 git push t-crest +upstream
 git push llvmorg-12.0.1
 ```
 
-* Create a diff of the difference between Patmos HEAD and `llvmorg-11.1.0`, which will then contain all Patmos-specific code/changes:
+- Create a diff of the difference between Patmos HEAD and `llvmorg-11.1.0`, which will then contain all Patmos-specific code/changes:
+
 ```sh
 git diff llvmorg-11.1.0 master > patmos-diff.patch
 ```
 
-* Move to a temporary branch where you apply the changes to the latest LLVM release:
+- Move to a temporary branch where you apply the changes to the latest LLVM release:
+
 ```sh
 git checkout llvmorg-12.0.1 -b tempbranch
 git apply --reject --verbose --ignore-whitespace patmos-diff.patch
 ```
 
-* Git has now applied all changes it can. Where unable, it left a `*.rej` file containing the unapplied patmos changes (where `*` is th name of the file containing the unapplied code).
-Go through the project and apply rejected code manually and deleting the `*.rej` files as you go.
-To check whether you applied the diff correctly, you can print out the changes (`git diff > post-apply-patmos-diff.patch`) and compare it with the original diff (`diff post-apply-patmos-diff.patch patmos-diff.patch`). 
-The differences should be minor and only in non-patmos code.
+- Git has now applied all changes it can. Where unable, it left a `*.rej` file containing the unapplied patmos changes (where `*` is th name of the file containing the unapplied code).
+  Go through the project and apply rejected code manually and deleting the `*.rej` files as you go.
+  To check whether you applied the diff correctly, you can print out the changes (`git diff > post-apply-patmos-diff.patch`) and compare it with the original diff (`diff post-apply-patmos-diff.patch patmos-diff.patch`).
+  The differences should be minor and only in non-patmos code.
 
-* Commit: `git commit -m "Merged Patmos HEAD with llvmorg-12.0.1"`
+- Commit: `git commit -m "Merged Patmos HEAD with llvmorg-12.0.1"`
 
-* Rewrite git history, to show that the last Patmos commit is also a parent of the new one (to make it look like we merged it with `llvmorg-12.0.1`):
+- Rewrite git history, to show that the last Patmos commit is also a parent of the new one (to make it look like we merged it with `llvmorg-12.0.1`):
+
 ```sh
 git replace --graft tempbranch llvmorg-12.0.1 master
 git filter-branch llvmorg-12.0.1..tempbranch
 ```
 
-* Change `master` to point to the new commit, delete the temporary branch, and push to T-CREST reposity:
+- Change `master` to point to the new commit, delete the temporary branch, and push to T-CREST reposity:
+
 ```sh
 git branch -f master tempbranch
 git checkout master
@@ -263,7 +271,8 @@ The git history will showing as being a merge of the two commits.
 After this, the Patmos code will probably need tweaking to conform to any changes LLVM has made since the last release.
 
 ---
-Here are Christine's notes, these notes will be deleted/merged in proper release branch 
+
+Here are Christine's notes, these notes will be deleted/merged in proper release branch
 
 ### INVESTIGATIONS:
 
@@ -295,7 +304,7 @@ make -C build llvm-tblgen
 # Ensure that Patmos table instruction thingies are built
 build/bin/llvm-tblgen -gen-instr-info -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenInstrInfo.inc
 make -C build llvm-tblgen && build/bin/llvm-tblgen -gen-register-info -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenRegisterInfo.inc
-cp build/lib/Target/Patmos/PatmosGenRegisterInfo* llvm/lib/Target/Patmos/ 
+cp build/lib/Target/Patmos/PatmosGenRegisterInfo* llvm/lib/Target/Patmos/
 build/bin/llvm-tblgen -gen-asm-matcher -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenAsmMatcher.inc
 cp build/lib/Target/Patmos/PatmosGenAsmMatcher.inc llvm/lib/Target/Patmos/
 
@@ -323,6 +332,7 @@ cmake --build build --target llc -j16
 ```
 
 How to compile the stuff later:
+
 ```zsh
 
 # 0) This is how to compile the code
@@ -350,19 +360,20 @@ brew install lp_solve
 ```
 
 How to even install the bloody thing?
+
 ```zsh
 ./patmos-platin/install.sh -i ./platin-inst
 ```
 
 ## Extra flags
 
-`-mpatmos-skip-postra-scheduler` is possible to use to skip Patmos post-RA scheduling to avoid reg-unit assertions. Default is `false` 
+`-mpatmos-skip-postra-scheduler` is possible to use to skip Patmos post-RA scheduling to avoid reg-unit assertions. Default is `false`
 but for whatever reason you might need it, there's an option for that. This was initially used to analyze crash issues during compiling to
 eliminate red-herrings.
 
 ## Note, apparently pasim needs to be installed to run the LLVM tests...
-(WHY WASNT THIS DOCUMENTED, TODO, ADD A ERROR MESSAGE WHERE IT ASKS PEOPLE THAT THEY MUST INSTALL IT)
 
+(WHY WASNT THIS DOCUMENTED, TODO, ADD A ERROR MESSAGE WHERE IT ASKS PEOPLE THAT THEY MUST INSTALL IT)
 
 LLVM Requiring stricter physical register live-li-ness and stronger typed calling
 is going to be the eeeeeend of meeeeeeee.
@@ -370,10 +381,11 @@ is going to be the eeeeeend of meeeeeeee.
 /Users/christineek/CLionProjects/patmos-llvm-project/llvm/test/CodeGen/Patmos/programs/bounded/single_source/instruction_combinations/trunc_to_br_condition.ll
 
 Sanity reminder
+
 ```zsh
 # Build it
-nix build .#patmos-newlib -L 
-# Copy it 
+nix build .#patmos-newlib -L
+# Copy it
 nix copy --to file:///Volumes/T7/nix-cache .#patmos-newlib
 # Collect it
 nix-collect-garbage -d
@@ -383,6 +395,7 @@ nix copy --from file:///Volumes/T7/nix-cache .#patmos-newlib
 ```
 
 Bless the Omnissiah for the following method to eliminate derivation being over sensitive
+
 ```nix
 let
   repoSrc = ../..;
@@ -411,10 +424,10 @@ let
 ```
 
 Uploading it to cachix manually
+
 ```zsh
 nix build .#patmos-prefixed -L --show-trace --no-link --print-out-paths | cachix push kodalem
 # Do not forget to copy the signing key, because they do not support multiple keys in multiple caches.
 ```
-
 
 Maintenance - be sure to update the secrets in the github repository if a new cache signing key from cachix, and check the CI file as well in the workflow

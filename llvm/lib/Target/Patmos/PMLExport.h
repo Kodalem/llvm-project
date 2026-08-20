@@ -230,10 +230,18 @@ namespace llvm {
     ///     no or a different IR block, MBB generates a BB event.
     /// (2) if there is a MBB generating a event BB, the basic block BB also
     ///     generates this event
+    ///
+    /// NameStorage owns the backing strings for event names computed via
+    /// BasicBlock::getNameOrAsOperand() (needed because unnamed IR blocks,
+    /// as commonly produced by rustc, have an empty BasicBlock::getName();
+    /// getNameOrAsOperand() falls back to a unique "%<slot>" label so the
+    /// event maps stay distinguishable per-block instead of collapsing every
+    /// block onto the same empty-string event).
     void buildEventMaps(MachineFunction &MF,
                         std::map<const BasicBlock*,StringRef> &BitcodeEventMap,
                         std::map<MachineBasicBlock*,StringRef> &MachineEventMap,
-                        std::set<StringRef> &TabuList);
+                        std::set<StringRef> &TabuList,
+                        std::set<std::string> &NameStorage);
 
     class BackedgeInfo {
     private:
