@@ -25,7 +25,8 @@ static cl::opt<PrintBytesLevel> PrintBytes("fpatmos-print-bytes",
     ));
 
 
-PatmosMCAsmInfo::PatmosMCAsmInfo(const Triple &TheTriple)
+PatmosMCAsmInfo::PatmosMCAsmInfo(const Triple &TheTriple, const MCTargetOptions &Options)
+    : MCAsmInfoELF(Options)
 {
   CodePointerSize = 4;
   IsLittleEndian = false;
@@ -33,7 +34,7 @@ PatmosMCAsmInfo::PatmosMCAsmInfo(const Triple &TheTriple)
   SeparatorString = ";";
   CommentString = "#";
   LabelSuffix = ":";
-  PrivateGlobalPrefix = ".PPG"; // Patmos Private Global (PGP)
+  LinkerPrivateGlobalPrefix = ".PPG"; // Patmos Private Global (PGP)
   AlignmentIsInBytes = true;
   MaxInstLength = 8; // for long immediates
   SupportsDebugInformation = true;

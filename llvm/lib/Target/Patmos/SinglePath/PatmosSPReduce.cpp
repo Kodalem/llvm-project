@@ -40,6 +40,7 @@
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/DOTGraphTraits.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <map>
@@ -311,9 +312,8 @@ namespace llvm {
         std::queue<MachineBasicBlock *> worklist;
 
         // fill worklist initially in dfs postorder
-        for (po_iterator<MachineBasicBlock *> POI = po_begin(&MF.front()),
-            POIe = po_end(&MF.front());  POI != POIe; ++POI) {
-          worklist.push(*POI);
+        for (MachineBasicBlock *MBB : llvm::post_order(&MF.front())) {
+          worklist.push(MBB);
         }
 
         // iterate.

@@ -824,7 +824,7 @@ unsigned int PatmosInstrInfo::getInstrSize(const MachineInstr *MI) const {
     const char *AsmStr = MI->getOperand(NumDefs).getSymbolName();
 
     const TargetSubtargetInfo *STI = &MI->getMF()->getSubtarget();
-    return getInlineAsmLength(AsmStr, *PTM.getMCAsmInfo(), STI);
+    return getInlineAsmLength(AsmStr, PTM.getMCAsmInfo(), STI);
   }
   else if (MI->isBundle()) {
     // Bundles can only be made up of 2 4-byte instructions

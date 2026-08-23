@@ -99,6 +99,7 @@ add_clang_library(clangDriver
   ToolChains/PPCFreeBSD.cpp
   ToolChains/InterfaceStubs.cpp
   ToolChains/ZOS.cpp
+  ToolChains/Patmos.cpp
   Types.cpp
   XRayArgs.cpp
 

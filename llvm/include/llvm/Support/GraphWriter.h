@@ -419,7 +419,7 @@ std::string WriteGraph(const GraphType &G, const Twine &Name,
     return "";
   }
 
-  llvm::WriteGraph(O, G, ShortNames, Title);
+  WriteGraph(O, G, ShortNames, Title);
   errs() << " done. \n";
 
   return Filename;
@@ -432,7 +432,7 @@ LLVM_DUMP_METHOD void
 dumpDotGraphToFile(const GraphType &G, const Twine &FileName,
                    const Twine &Title, bool ShortNames = false,
                    const Twine &Name = "") {
-  llvm::WriteGraph(G, Name, ShortNames, Title, FileName.str());
+  WriteGraph(G, Name, ShortNames, Title, FileName.str());
 }
 #endif
 
@@ -443,7 +443,7 @@ template<typename GraphType>
 void ViewGraph(const GraphType &G, const Twine &Name,
                bool ShortNames = false, const Twine &Title = "",
                GraphProgram::Name Program = GraphProgram::DOT) {
-  std::string Filename = llvm::WriteGraph(G, Name, ShortNames, Title);
+  std::string Filename = WriteGraph(G, Name, ShortNames, Title);
 
   if (Filename.empty())
     return;

@@ -84,8 +84,8 @@ public:
   void emitValueToAlignment(Align Alignment, int64_t Fill = 0,
                             uint8_t FillLen = 1,
                             unsigned MaxBytesToEmit = 0) override {}
-  void emitCodeAlignment(Align Alignment,
-                         const MCSubtargetInfo *STI, unsigned MaxBytesToEmit = 0) override {}
+  void emitCodeAlignment(Align Alignment, const MCSubtargetInfo &STI,
+                                 unsigned MaxBytesToEmit = 0) override {}
   void emitValueToOffset(const MCExpr *Offset,  unsigned char Value,
                          SMLoc Loc) override {}
   void emitFileDirective(StringRef Filename) override {}

@@ -194,7 +194,7 @@ PatmosRegisterInfo::expandPseudoPregInstr(MachineBasicBlock::iterator II,
         //   followed by a predicated (inverted) store of 0
         BuildMI(MBB, II, DL, TII.get(st_opc))
           .add(SrcRegOpnd).addImm(0) // predicate
-          .addReg(basePtr, false).addImm(offset) // adress
+          .addReg(basePtr).addImm(offset) // adress
           .addReg(Patmos::RSP); // a non-zero value, i.e. RSP
 
         // if we are writing $p0 to a stack slot (e.g. to overwrite a prev.
@@ -202,7 +202,7 @@ PatmosRegisterInfo::expandPseudoPregInstr(MachineBasicBlock::iterator II,
         if (SrcRegOpnd.getReg() != Patmos::P0) {
           BuildMI(MBB, II, DL, TII.get(st_opc))
             .add(SrcRegOpnd).addImm(1) // predicate, inverted
-            .addReg(basePtr, false).addImm(offset) // address
+            .addReg(basePtr).addImm(offset) // address
             .addReg(Patmos::R0); // zero
         }
       }
@@ -215,7 +215,7 @@ PatmosRegisterInfo::expandPseudoPregInstr(MachineBasicBlock::iterator II,
         unsigned DestReg = PseudoMI.getOperand(0).getReg();
 
         AddDefaultPred(BuildMI(MBB, II, DL, TII.get(ld_opc), Patmos::RTR))
-          .addReg(basePtr, false).addImm(offset); // address
+          .addReg(basePtr).addImm(offset); // address
         AddDefaultPred(BuildMI(MBB, II, DL, TII.get(Patmos::MOVrp), DestReg))
           .addReg(Patmos::RTR, RegState::Kill); // mov p <- r
       }

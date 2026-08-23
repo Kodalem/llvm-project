@@ -228,7 +228,7 @@ void PatmosAsmPrinter::emitInstruction(const MachineInstr *MI) {
     bool isBundled = (Index < Size - 1);
     MCI.addOperand(MCOperand::createImm(isBundled));
 
-    OutStreamer->emitInstruction(MCI, *TM.getMCSubtargetInfo());
+    OutStreamer->emitInstruction(MCI, TM.getMCSubtargetInfo());
   }
 }
 
@@ -548,7 +548,7 @@ void PatmosAsmPrinter::mockEmitInlineAsmForSizeCount(const MachineInstr *MI) con
   SmallString<256> StringData;
   raw_svector_ostream OS(StringData);
   AsmPrinter *AP = (AsmPrinter*)this;
-  EmitGCCInlineAsmStr(AsmStr, MI, MMI, (int)MAI->getAssemblerDialect(), AP, (unsigned)0, OS);
+  EmitGCCInlineAsmStr(AsmStr, MI, MMI, (int)MAI.getAssemblerDialect(), AP, (unsigned)0, OS);
 
   std::unique_ptr<MemoryBuffer> Buffer;
   // The inline asm source manager will outlive AsmStr, so make a copy of the
@@ -558,12 +558,12 @@ void PatmosAsmPrinter::mockEmitInlineAsmForSizeCount(const MachineInstr *MI) con
   unsigned BufNum = srcMgr.AddNewSourceBuffer(std::move(Buffer), SMLoc());
 
   // The MC parser expects a current section to be active.
-  OutStreamer->initSections(/*NoExecStack=*/false, *TM.getMCSubtargetInfo());
+  OutStreamer->initSections(TM.getMCSubtargetInfo());
 
   std::unique_ptr<MCAsmParser> Parser(createMCAsmParser(
-      srcMgr, OutContext, *OutStreamer, *MAI, BufNum));
+      srcMgr, OutContext, *OutStreamer, MAI, BufNum));
   std::unique_ptr<MCTargetAsmParser> TAP(TM.getTarget().createMCAsmParser(
-      *TM.getMCSubtargetInfo(), *Parser, *TM.getMCInstrInfo(), TM.Options.MCOptions));
+      TM.getMCSubtargetInfo(), *Parser, *TM.getMCInstrInfo()));
   Parser->setTargetParser(*TAP.get());
   int Res = Parser->Run(true,true);
 

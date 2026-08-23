@@ -745,9 +745,7 @@ std::map<const SPScope*, RAInfo> RAInfo::computeRegAlloc(SPScope *rootScope, uns
   std::map<const SPScope*, RAInfo> RAInfos;
   // perform reg-allocation in post-order to compute cumulative location
   // numbers in one go
-  for (auto iter = po_begin(rootScope), end = po_end(rootScope);
-      iter!=end; ++iter) {
-    auto scope = *iter;
+  for (SPScope* scope : llvm::post_order(rootScope)) {
     // create RAInfo for SPScope
     RAInfos.insert(std::make_pair(scope, RAInfo(scope,  AvailPredRegs)));
     RAInfo &RI = RAInfos.at(scope);
@@ -758,8 +756,8 @@ std::map<const SPScope*, RAInfo> RAInfo::computeRegAlloc(SPScope *rootScope, uns
         CI != CE; ++CI) {
       SPScope *CN = *CI;
       RI.Priv->unifyWithChild(*(RAInfos.at(CN).Priv));
-    }
-  } // end of PO traversal for RegAlloc
+        }
+  }
 
 
   // Visit all scopes in depth-first order to compute offsets:

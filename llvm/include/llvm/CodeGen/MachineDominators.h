@@ -40,7 +40,7 @@ using MachineDomTreeNode = DomTreeNodeBase<MachineBasicBlock>;
 
 namespace DomTreeBuilder {
 using MBBDomTree = DomTreeBase<MachineBasicBlock>;
-using MBBUpdates = ArrayRef<llvm::cfg::Update<MachineBasicBlock *>>;
+using MBBUpdates = ArrayRef<cfg::Update<MachineBasicBlock *>>;
 using MBBDomTreeGraphDiff = GraphDiff<MachineBasicBlock *, false>;
 
 extern template LLVM_TEMPLATE_ABI void Calculate<MBBDomTree>(MBBDomTree &DT);

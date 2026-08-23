@@ -174,12 +174,6 @@ AddModuleResult ModuleManager::addModule(
     return Result;
   }
 
-  // Allocate a new module.
-  auto NewModule = std::make_unique<ModuleFile>(Type, *Entry, Generation);
-  NewModule->Index = Chain.size();
-  NewModule->FileName = FileName.str();
-  NewModule->ImportLoc = ImportLoc;
-  NewModule->InputFilesValidationTimestamp = InputFilesValidationTimestamp;
 
   // Load the contents of the module
   off_t Size = ExpectedSize;

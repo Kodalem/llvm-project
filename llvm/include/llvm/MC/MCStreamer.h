@@ -36,6 +36,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "llvm/MC/MCSubtargetInfo.h"
 
 namespace llvm {
 

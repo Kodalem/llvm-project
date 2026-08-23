@@ -24,7 +24,7 @@ namespace llvm {
 
   class PatmosMCAsmInfo : public MCAsmInfoELF {
     public:
-      explicit PatmosMCAsmInfo(const Triple &TheTriple);
+      explicit PatmosMCAsmInfo(const Triple &TheTriple, const MCTargetOptions &Options);
 
       virtual ~PatmosMCAsmInfo() {}
   };

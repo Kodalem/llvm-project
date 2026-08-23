@@ -133,8 +133,6 @@ PatmosTargetLowering::PatmosTargetLowering(const PatmosTargetMachine &tm,
   setOperationAction(ISD::BSWAP, MVT::i32, Expand);
   setOperationAction(ISD::CTTZ, MVT::i32, Expand);
   setOperationAction(ISD::CTLZ, MVT::i32, Expand);
-  setOperationAction(ISD::CTTZ_ZERO_UNDEF, MVT::i32, Expand);
-  setOperationAction(ISD::CTLZ_ZERO_UNDEF, MVT::i32, Expand);
   setOperationAction(ISD::CTPOP, MVT::i32, Expand);
 
   setOperationAction(ISD::SIGN_EXTEND, MVT::i8, Expand);
@@ -320,7 +318,7 @@ SDValue PatmosTargetLowering::LowerFRAMEADDR(SDValue Op,
 //===----------------------------------------------------------------------===//
 //                      Calling Convention Implementation
 //===----------------------------------------------------------------------===//
-
+#define GET_CALLING_CONV_IMPL
 #include "PatmosGenCallingConv.inc"
 
 SDValue PatmosTargetLowering::LowerFormalArguments(

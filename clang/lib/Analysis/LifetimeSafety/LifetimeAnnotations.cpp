@@ -57,7 +57,7 @@ bool isAssignmentOperatorLifetimeBound(const CXXMethodDecl *CMD) {
 /// Check if a function has a lifetimebound attribute on its function type
 /// (which represents the implicit 'this' parameter for methods).
 /// Returns the attribute if found, nullptr otherwise.
-static const LifetimeBoundAttr *
+const LifetimeBoundAttr *
 getLifetimeBoundAttrFromFunctionType(const TypeSourceInfo &TSI) {
   // Walk through the type layers looking for a lifetimebound attribute.
   TypeLoc TL = TSI.getTypeLoc();

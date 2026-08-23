@@ -295,6 +295,7 @@ namespace llvm {
     unsigned computeExitLatency(SUnit &SU);
   };
 
-}
+} // end namespace llvm
+
 
 #endif

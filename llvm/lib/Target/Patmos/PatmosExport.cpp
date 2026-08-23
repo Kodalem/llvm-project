@@ -142,6 +142,7 @@ namespace llvm {
   };
 
   // we need information about the calling conventions!
+  #define GET_CALLING_CONV_IMPL
   #include "PatmosGenCallingConv.inc"
 
   class PatmosMachineExport : public PMLMachineExport {

@@ -47,8 +47,8 @@ class PatmosAsmParser : public MCTargetAsmParser {
 
 public:
   PatmosAsmParser(const MCSubtargetInfo &sti, MCAsmParser &parser,
-                  const MCInstrInfo &MII, const MCTargetOptions &Options)
-    : MCTargetAsmParser(Options, sti, MII), Parser(parser), MII(MII),
+                  const MCInstrInfo &MII)
+    : MCTargetAsmParser(sti, MII), Parser(parser), MII(MII),
       InBundle(false), BundleCounter(0)
   {
     IssueWidth = sti.getSchedModel().IssueWidth;

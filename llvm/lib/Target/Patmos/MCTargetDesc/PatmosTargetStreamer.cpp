@@ -18,6 +18,7 @@
 #include "llvm/MC/MCContext.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
+#include "llvm/MC/MCSubtargetInfo.h"
 
 using namespace llvm;
 
@@ -38,7 +39,7 @@ void PatmosTargetAsmStreamer::emitFStart(const MCSymbol *Start,
   // this is used by dump() and some asm printing paths).
   OS << "\t.fstart\t" << *Start << ", ";
   if (Size)
-    getContext().getAsmInfo()->printExpr(OS, *Size);
+    getContext().getAsmInfo().printExpr(OS, *Size);
   else
     OS << "<null>";
   OS << ", " << Alignment.value() << "\n";
@@ -51,7 +52,13 @@ void PatmosTargetELFStreamer::emitFStart(const MCSymbol *Start,
       const MCExpr* Size, Align Alignment)
 {
   // Pass the subtarget info as nullptr (no STI available here)
-  getStreamer().emitCodeAlignment(Align(Alignment.value()), /*STI*/ nullptr);
+  if (const MCSubtargetInfo *STI = getStreamer().getContext().getSubtargetInfo()) {
+    getStreamer().emitCodeAlignment(Align(Alignment.value()), *STI);
+  } else {
+    // Safe fallback if MCContext doesn't map a subtarget context during this phase,
+    // this used to be a nullptr before before upgrading from LLVM 22 to LLVM23
+    report_fatal_error("MCContext is missing SubtargetInfo inside PatmosTargetStreamer.");
+  }
   getStreamer().emitValue(Size, 4);
 
 }

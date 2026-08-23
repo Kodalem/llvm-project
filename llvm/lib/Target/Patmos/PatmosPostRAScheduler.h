@@ -32,7 +32,8 @@ namespace llvm {
   class MachineLoopInfo;
   class MachineDominatorTree;
   class RegisterClassInfo;
-  class TargetRegisterClass;
+  class MCRegisterClass;
+  using TargetRegisterClass = MCRegisterClass;
   class SUnit;
   class SchedDFSResult;
   class AntiDepBreaker;

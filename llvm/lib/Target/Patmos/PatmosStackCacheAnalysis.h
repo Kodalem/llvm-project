@@ -51,6 +51,6 @@ public:
   static char ID; // Pass identification, replacement for typeid
 };
 
-} // End llvm namespace
+} // end namespace llvm
 
 #endif

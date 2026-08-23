@@ -741,6 +741,8 @@ public:
   LLVMELFDumper(const object::ELFObjectFile<ELFT> &ObjF, ScopedPrinter &Writer)
       : ELFDumper<ELFT>(ObjF, Writer), W(Writer) {}
 
+  void printCallGraphInfo();
+
   void printFileHeaders() override;
   void printGroupSections() override;
   void printRelocations() override;

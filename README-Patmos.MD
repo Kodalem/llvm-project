@@ -308,6 +308,10 @@ cp build/lib/Target/Patmos/PatmosGenRegisterInfo* llvm/lib/Target/Patmos/
 build/bin/llvm-tblgen -gen-asm-matcher -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenAsmMatcher.inc
 cp build/lib/Target/Patmos/PatmosGenAsmMatcher.inc llvm/lib/Target/Patmos/
 
+
+build/bin/llvm-tblgen -gen-callingconv -I llvm/lib/Target/Patmos -I llvm/include -I llvm/lib/Target llvm/lib/Target/Patmos/Patmos.td -o build/lib/Target/Patmos/PatmosGenCallingConv.inc
+cp build/lib/Target/Patmos/PatmosGenCallingConv.inc llvm/lib/Target/Patmos/
+  
 ```
 
 What the hecc to do next...

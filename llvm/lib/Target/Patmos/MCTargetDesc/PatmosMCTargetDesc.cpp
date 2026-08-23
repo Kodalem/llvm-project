@@ -37,7 +37,7 @@ static MCAsmInfo *createPatmosMCAsmInfo(const MCRegisterInfo &MRI,
                                         const Triple &TT,
                                         const MCTargetOptions &Options)
 {
-  MCAsmInfo *MAI = new PatmosMCAsmInfo(TT);
+  MCAsmInfo *MAI = new PatmosMCAsmInfo(TT, Options);
 
   unsigned SP = MRI.getDwarfRegNum(Patmos::RSP, true);
   MCCFIInstruction Inst = MCCFIInstruction::cfiDefCfa(nullptr, SP, 0);

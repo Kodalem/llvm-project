@@ -39,7 +39,7 @@ public:
         );
   }
 
-  bool setCPU(const std::string &Name) override {
+  bool setCPU(StringRef Name) override {
     if (!isValidCPUName(Name))
       return false;
     // We don't have any special CPUs

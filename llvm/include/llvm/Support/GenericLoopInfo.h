@@ -241,13 +241,13 @@ public:
   bool isLoopLatch(const BlockT *BB) const {
     assert(!isInvalid() && "Loop not in a valid state!");
     assert(contains(BB) && "block does not belong to the loop");
-    return llvm::is_contained(inverse_children<BlockT *>(getHeader()), BB);
+    return is_contained(inverse_children<BlockT *>(getHeader()), BB);
   }
 
   /// Calculate the number of back edges to the loop header.
   unsigned getNumBackEdges() const {
     assert(!isInvalid() && "Loop not in a valid state!");
-    return llvm::count_if(inverse_children<BlockT *>(getHeader()),
+    return count_if(inverse_children<BlockT *>(getHeader()),
                           [&](BlockT *Pred) { return contains(Pred); });
   }
 
@@ -410,7 +410,7 @@ public:
   /// This removes the specified child from being a subloop of this loop. The
   /// loop is not deleted, as it will presumably be inserted into another loop.
   LoopT *removeChildLoop(LoopT *Child) {
-    return removeChildLoop(llvm::find(*this, Child));
+    return removeChildLoop(find(*this, Child));
   }
 
   /// This adds a basic block directly to the basic block list.

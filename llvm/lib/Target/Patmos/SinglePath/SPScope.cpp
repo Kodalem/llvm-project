@@ -891,9 +891,8 @@ std::vector<PredicatedBlock*> SPScope::getBlocksTopoOrd() const
 
   // dfs the fcfg in postorder
   std::vector<PredicatedBlock *> PO;
-  for (auto I = po_begin(&fcfg), E = po_end(&fcfg);
-      I != E; ++I) {
-    auto block = const_cast<PredicatedBlock*>((*I)->Block);
+  for (auto *Node : llvm::post_order(&fcfg)) {
+    auto block = const_cast<PredicatedBlock*>(Node->Block);
     if (block) {
       PO.push_back(block);
     }
