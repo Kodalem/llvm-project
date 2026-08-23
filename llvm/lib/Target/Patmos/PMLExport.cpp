@@ -468,7 +468,23 @@ void PMLMachineExport::exportCallInstruction(MachineFunction &MF,
     // https://github.com/llvm/llvm-project/issues/90542
     auto *target = getMaybeAliasedFunction(*it, MF.getFunction().getParent());
 
-    assert(target);
+    // Some call operands (e.g. compiler-rt / soft-float runtime helpers such
+    // as __adddf3, __muldf3, __divdf3, __floatunsidf) are introduced by
+    // SelectionDAG legalization as raw external-symbol operands and have no
+    // corresponding IR Function in this module, so they cannot be resolved
+    // to a Function* here. Rather than discarding the callee (which forces
+    // the call to fall back to the "__any__" wildcard below and makes it
+    // look like an unresolved indirect call to platin), emit the raw
+    // external-symbol name directly. Platin resolves callees by name across
+    // the whole set of merged PML inputs (see
+    // PML::Program#called_functions / #by_label_or_name), so as long as a
+    // PML module somewhere in the analysis defines a machine-function runtime helpers
+    // from mentioned before, thusly the call is correctly treated as resolved.
+    // Resolves the issue with Platin being unable the Rust code that uses floats.
+    if (!target) {
+      I->addCallee(*it);
+      continue;
+    }
 
     I->addCallee(target->getName());
   }
@@ -1215,14 +1231,22 @@ void PMLModuleExportPass::addToQueue(const Module &M, MachineModuleInfo &MMI,
                                      std::string FnName) {
   const Function *F = M.getFunction(FnName);
   if (!F) {
-    errs() << "[mc2yml] Could not find function " << FnName << " in module.\n";
-    assert(false);
+    // A requested root (e.g. "_start", configured globally via
+    // -mserialize-pml-functions) may not exist in every compiled module,
+    // for example when the same rustflags apply while building library
+    // crates such as core/compiler_builtins that never define an entry
+    // point. Skip silently instead of asserting, since this is an expected
+    // per-module condition rather than an internal invariant violation.
+    LLVM_DEBUG(dbgs() << "[mc2yml] Could not find function " << FnName
+                      << " in module.\n");
+    return;
   }
 
   MachineFunction *MF = MMI.getMachineFunction(*F);
   if (!MF) {
-    errs() << "[mc2yml] MachineFunction for '" << FnName << "' not found!\n";
-    assert(false);
+    LLVM_DEBUG(dbgs() << "[mc2yml] MachineFunction for '" << FnName
+                      << "' not found!\n");
+    return;
   }
 
   addToQueue(*MF);

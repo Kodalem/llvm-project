@@ -76,6 +76,15 @@ namespace {
   static cl::list<std::string>SerializeRoots("mserialize-pml-functions",
      cl::desc("Export only given method (default: 'main') and those reachable from them"),
      cl::CommaSeparated);
+  static cl::opt<bool> SerializeAllFunctions(
+      "mserialize-pml-all",
+      cl::init(false),
+      cl::desc("Export PML machine-function entries for every function "
+               "defined in the module, ignoring -mserialize-pml-functions "
+               "reachability roots. Useful for compiling library crates "
+               "(e.g. compiler_builtins from Rust) on their own, where none of the "
+               "library's own functions are reachable from a 'main'/'_start' "
+               "root within that compilation unit."));
 
 
 
@@ -342,7 +351,8 @@ namespace {
         }
 
         addPass(createPatmosModuleExportPass(getPatmosTargetMachine(),
-            SerializeMachineCode, empty, SerializeRoots, false));
+            SerializeMachineCode, empty, SerializeRoots,
+            SerializeAllFunctions));
       }
       if(PatmosSinglePathInfo::isEnabled()) {
     	  addPass(createSinglePathInstructionCounter(getPatmosTargetMachine()));
