@@ -15,6 +15,24 @@
 #define ABI_NAMESPACE_STR _LIBCPP_TOSTRING(_LIBCPP_ABI_NAMESPACE)
 
 _LIBCPP_BEGIN_NAMESPACE_STD
+_LIBCPP_BEGIN_EXPLICIT_ABI_ANNOTATIONS
+
+// This file implements the various stream objects provided inside <iostream>. We're doing some ODR violations in here,
+// so this quite fragile. Specifically, the size of the stream objects (i.e. cout, cin etc.) needs to stay the same.
+// For that reason, we have `stream` and `stream_data` separated into two objects. The public `stream` objects only
+// contain the actual stream, while the private `stream_data` objects contains the `basic_streambuf` we're using as well
+// as the mbstate_t. `stream_data` objects are only accessible within the library, so they aren't ABI sensitive and we
+// can change them as we want.
+
+template <class StreamT>
+union stream {
+  constexpr stream() {}
+  stream(const stream&)            = delete;
+  stream& operator=(const stream&) = delete;
+  constexpr ~stream() {}
+
+  StreamT value;
+};
 
 // This file implements the various stream objects provided inside <iostream>. We're doing some ODR violations in here,
 // so this quite fragile. Specifically, the size of the stream objects (i.e. cout, cin etc.) needs to stay the same.
@@ -154,4 +172,5 @@ ios_base::Init::Init() {
 
 ios_base::Init::~Init() {}
 
+_LIBCPP_END_EXPLICIT_ABI_ANNOTATIONS
 _LIBCPP_END_NAMESPACE_STD

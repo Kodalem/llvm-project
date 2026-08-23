@@ -14,6 +14,14 @@ if(WIN32)
   set(system_libs version)
 endif()
 
+if(CLANG_USE_XCSELECT)
+  set(system_libs xcselect)
+endif()
+
+if(LLVM_PTHREAD_LIB)
+  list(APPEND system_libs ${LLVM_PTHREAD_LIB})
+endif()
+
 add_clang_library(clangDriver
   Action.cpp
   Compilation.cpp
@@ -22,6 +30,7 @@ add_clang_library(clangDriver
   Distro.cpp
   Driver.cpp
   Job.cpp
+  ModulesDriver.cpp
   Multilib.cpp
   MultilibBuilder.cpp
   OffloadBundler.cpp
@@ -30,6 +39,7 @@ add_clang_library(clangDriver
   Tool.cpp
   ToolChain.cpp
   ToolChains/Arch/AArch64.cpp
+  ToolChains/Arch/AMDGPU.cpp
   ToolChains/Arch/ARM.cpp
   ToolChains/Arch/CSKY.cpp
   ToolChains/Arch/LoongArch.cpp
@@ -43,7 +53,6 @@ add_clang_library(clangDriver
   ToolChains/Arch/X86.cpp
   ToolChains/AIX.cpp
   ToolChains/AMDGPU.cpp
-  ToolChains/AMDGPUOpenMP.cpp
   ToolChains/AVR.cpp
   ToolChains/BareMetal.cpp
   ToolChains/Clang.cpp
@@ -68,18 +77,15 @@ add_clang_library(clangDriver
   ToolChains/LFILinux.cpp
   ToolChains/Linux.cpp
   ToolChains/Managarm.cpp
-  ToolChains/MinGW.cpp
-  ToolChains/MinGW.h
   ToolChains/MipsLinux.cpp
-  ToolChains/MipsLinux.h
+  ToolChains/MinGW.cpp
+  ToolChains/MSP430.cpp
+  ToolChains/MSVC.cpp
   ToolChains/NetBSD.cpp
-  ToolChains/NetBSD.h
   ToolChains/OHOS.cpp
-  ToolChains/OHOS.h
   ToolChains/OpenBSD.cpp
-  ToolChains/OpenBSD.h
   ToolChains/PS4CPU.cpp
-  ToolChains/Patmos.cpp
+  ToolChains/Serenity.cpp
   ToolChains/Solaris.cpp
   ToolChains/SPIRV.cpp
   ToolChains/SPIRVOpenMP.cpp
@@ -103,7 +109,12 @@ add_clang_library(clangDriver
 
   LINK_LIBS
   clangBasic
+  clangDependencyScanning
   clangFrontend
+  clangScalableStaticAnalysisAnalyses
+  clangScalableStaticAnalysisCore
+  clangScalableStaticAnalysisFrontend
+  clangScalableStaticAnalysisSourceTransformation
   clangSerialization
   clangLex
   clangOptions

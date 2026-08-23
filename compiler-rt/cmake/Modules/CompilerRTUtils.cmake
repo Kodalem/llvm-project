@@ -1,5 +1,6 @@
 include(CMakePushCheckState)
 include(CheckSymbolExists)
+include(GetToolchainDirs)
 
 # Because compiler-rt spends a lot of time setting up custom compile flags,
 # define a handy helper function for it. The compile flags setting in CMake
@@ -161,10 +162,10 @@ macro(detect_target_arch)
   check_symbol_exists(__powerpc64__ "" __PPC64)
   check_symbol_exists(__powerpc64le__ "" __PPC64LE)
   check_symbol_exists(__riscv "" __RISCV)
-  check_symbol_exists(__patmos__ "" __PATMOS)
   check_symbol_exists(__s390x__ "" __S390X)
   check_symbol_exists(__sparc "" __SPARC)
   check_symbol_exists(__sparcv9 "" __SPARCV9)
+  check_symbol_exists(__SPIRV64__ "" __SPIRV64)
   check_symbol_exists(__wasm32__ "" __WEBASSEMBLY32)
   check_symbol_exists(__wasm64__ "" __WEBASSEMBLY64)
   check_symbol_exists(__ve__ "" __VE)
@@ -216,14 +217,14 @@ macro(detect_target_arch)
     else()
       message(FATAL_ERROR "Unsupported XLEN for RISC-V")
     endif()
-  elseif(__PATMOS)
-    add_default_target_arch(patmos)
   elseif(__S390X)
     add_default_target_arch(s390x)
   elseif(__SPARCV9)
     add_default_target_arch(sparcv9)
   elseif(__SPARC)
     add_default_target_arch(sparc)
+  elseif(__SPIRV64)
+    add_default_target_arch(spirv64)
   elseif(__WEBASSEMBLY32)
     add_default_target_arch(wasm32)
   elseif(__WEBASSEMBLY64)
@@ -312,21 +313,21 @@ macro(load_llvm_config)
       "You are not using the monorepo layout. This configuration is DEPRECATED.")
   endif()
 
-  # Prefer modern CMake find_package(LLVM) first. If that fails and the user
-  # provided LLVM_CONFIG_PATH, fall back to querying llvm-config (legacy
-  # behavior). Suppress certain warnings for Patmos targets where upstream
-  # LLVM packaging may not provide optional components like XRay.
-  #
-  # Bare-metal targets (CMAKE_SYSTEM_NAME Generic) are not expected to have a working
-  # find_package(LLVM) configuration, so skip it to avoid spurious warnings.
-  # Sanity lost: 16 hours, waiting. Gained? None.
-  set(FOUND_LLVM_CMAKE_DIR FALSE)
-  set(LLVM_FOUND FALSE)
-
-  if (NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
-    find_package(LLVM HINTS "${LLVM_CMAKE_DIR}")
+  # Exports from LLVM and Clang may contain shared libraries. When targeting
+  # platforms that lack shared library support, importing such
+  # exports unrestrictedly will trigger an error. Set
+  # LLVM_OMIT_EXPORTS_FROM_CONFIG flag to skip importing these exports
+  # when the target platform does not support shared libraries.
+  get_property(HAS_SHARED_SUPPORT GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS)
+  if (NOT HAS_SHARED_SUPPORT)
+    set(LLVM_OMIT_EXPORTS_FROM_CONFIG ON)
   endif()
-  if (LLVM_FOUND)
+  find_package(LLVM HINTS "${LLVM_CMAKE_DIR}")
+  if (NOT LLVM_FOUND)
+     message(WARNING "UNSUPPORTED COMPILER-RT CONFIGURATION DETECTED: "
+                     "LLVM cmake package not found.\n"
+                     "Reconfigure with -DLLVM_CMAKE_DIR=/path/to/llvm.")
+  else()
     list(APPEND CMAKE_MODULE_PATH "${LLVM_DIR}")
     # Turn into CACHE PATHs for overwritting
     set(LLVM_BINARY_DIR "${LLVM_BINARY_DIR}" CACHE PATH "Path to LLVM build tree")
@@ -334,140 +335,27 @@ macro(load_llvm_config)
     set(LLVM_TOOLS_BINARY_DIR "${LLVM_TOOLS_BINARY_DIR}" CACHE PATH "Path to llvm/bin")
     set(LLVM_INCLUDE_DIR ${LLVM_INCLUDE_DIRS} CACHE PATH "Path to llvm/include and any other header dirs needed")
 
-    list(FIND LLVM_AVAILABLE_LIBS LLVMXRay XRAY_INDEX)
-    set(COMPILER_RT_HAS_LLVMXRAY TRUE)
-    if (XRAY_INDEX EQUAL -1)
-      if (NOT COMPILER_RT_DEFAULT_TARGET_ARCH MATCHES "patmos")
+    # These checks are irrelevant for the compiler-rt builtins build, which does
+    # not report these in LLVM_AVAILABLE_LIBS due to being BUILDTREE_ONLY.
+    if (NOT COMPILER_RT_BUILTINS_STANDALONE_BUILD)
+      list(FIND LLVM_AVAILABLE_LIBS LLVMXRay XRAY_INDEX)
+      set(COMPILER_RT_HAS_LLVMXRAY TRUE)
+      if (XRAY_INDEX EQUAL -1)
         message(WARNING "LLVMXRay not found in LLVM_AVAILABLE_LIBS")
+        set(COMPILER_RT_HAS_LLVMXRAY FALSE)
       endif()
-      set(COMPILER_RT_HAS_LLVMXRAY FALSE)
-    endif()
 
-    list(FIND LLVM_AVAILABLE_LIBS LLVMTestingSupport TESTINGSUPPORT_INDEX)
-    set(COMPILER_RT_HAS_LLVMTESTINGSUPPORT TRUE)
-    if (TESTINGSUPPORT_INDEX EQUAL -1)
-      if (NOT COMPILER_RT_DEFAULT_TARGET_ARCH MATCHES "patmos")
+      list(FIND LLVM_AVAILABLE_LIBS LLVMTestingSupport TESTINGSUPPORT_INDEX)
+      set(COMPILER_RT_HAS_LLVMTESTINGSUPPORT TRUE)
+      if (TESTINGSUPPORT_INDEX EQUAL -1)
         message(WARNING "LLVMTestingSupport not found in LLVM_AVAILABLE_LIBS")
-      endif()
-      set(COMPILER_RT_HAS_LLVMTESTINGSUPPORT FALSE)
-    endif()
-
-    set(LLVM_LIBRARY_OUTPUT_INTDIR
-      ${LLVM_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib${LLVM_LIBDIR_SUFFIX})
-  else()
-    # If find_package didn't locate LLVM, try llvm-config as a graceful
-    # fallback (legacy behavior). Only proceed if the user provided
-    # LLVM_CONFIG_PATH.
-    if (LLVM_CONFIG_PATH)
-      execute_process(
-        COMMAND ${LLVM_CONFIG_PATH} "--obj-root" "--bindir" "--libdir" "--src-root" "--includedir"
-        RESULT_VARIABLE HAD_ERROR
-        OUTPUT_VARIABLE CONFIG_OUTPUT
-        ERROR_QUIET)
-      if (NOT HAD_ERROR)
-        string(REGEX REPLACE "[ \t]*[\r\n]+[ \t]*" ";" CONFIG_OUTPUT ${CONFIG_OUTPUT})
-        list(GET CONFIG_OUTPUT 0 BINARY_DIR)
-        list(GET CONFIG_OUTPUT 1 TOOLS_BINARY_DIR)
-        list(GET CONFIG_OUTPUT 2 LIBRARY_DIR)
-        list(GET CONFIG_OUTPUT 3 MAIN_SRC_DIR)
-        list(GET CONFIG_OUTPUT 4 INCLUDE_DIR)
-
-        set(LLVM_BINARY_DIR ${BINARY_DIR} CACHE PATH "Path to LLVM build tree")
-        set(LLVM_LIBRARY_DIR ${LIBRARY_DIR} CACHE PATH "Path to llvm/lib")
-        set(LLVM_TOOLS_BINARY_DIR ${TOOLS_BINARY_DIR} CACHE PATH "Path to llvm/bin")
-        set(LLVM_INCLUDE_DIR ${INCLUDE_DIR} CACHE PATH "Paths to LLVM headers")
-
-        if (NOT EXISTS "${LLVM_MAIN_SRC_DIR_DEFAULT}")
-          # TODO(dliew): Remove this legacy fallback path.
-          message(WARNING
-            "Consulting llvm-config for the LLVM source path "
-            "as a fallback. This behavior will be removed in the future.")
-          # We don't set `LLVM_MAIN_SRC_DIR` directly to avoid overriding a user
-          # provided CMake cache value.
-          set(LLVM_MAIN_SRC_DIR_DEFAULT "${MAIN_SRC_DIR}")
-          message(STATUS "Using LLVM source path (${LLVM_MAIN_SRC_DIR_DEFAULT}) from llvm-config")
-        endif()
-
-        # Detect optional LLVM libraries (xray/testingsupport) via llvm-config.
-        execute_process(
-          COMMAND ${LLVM_CONFIG_PATH} "--ldflags" "--libs" "xray"
-          RESULT_VARIABLE HAD_ERROR_XRAY
-          OUTPUT_VARIABLE CONFIG_OUTPUT_XRAY
-          ERROR_QUIET)
-        if (HAD_ERROR_XRAY)
-          if (NOT COMPILER_RT_DEFAULT_TARGET_ARCH MATCHES "patmos")
-            message(WARNING "llvm-config finding xray failed with status ${HAD_ERROR_XRAY}")
-          endif()
-          set(COMPILER_RT_HAS_LLVMXRAY FALSE)
-        else()
-          string(REGEX REPLACE "[ \t]*[\r\n]+[ \t]*" ";" CONFIG_OUTPUT_XRAY ${CONFIG_OUTPUT_XRAY})
-          list(GET CONFIG_OUTPUT_XRAY 0 LDFLAGS)
-          list(GET CONFIG_OUTPUT_XRAY 1 LIBLIST)
-          file(TO_CMAKE_PATH "${LDFLAGS}" LDFLAGS)
-          file(TO_CMAKE_PATH "${LIBLIST}" LIBLIST)
-          set(LLVM_XRAY_LDFLAGS ${LDFLAGS} CACHE STRING "Linker flags for LLVMXRay library")
-          set(LLVM_XRAY_LIBLIST ${LIBLIST} CACHE STRING "Library list for LLVMXRay")
-          set(COMPILER_RT_HAS_LLVMXRAY TRUE)
-        endif()
-
         set(COMPILER_RT_HAS_LLVMTESTINGSUPPORT FALSE)
-        execute_process(
-          COMMAND ${LLVM_CONFIG_PATH} "--ldflags" "--libs" "testingsupport"
-          RESULT_VARIABLE HAD_ERROR_TS
-          OUTPUT_VARIABLE CONFIG_OUTPUT_TS
-          ERROR_QUIET)
-        if (HAD_ERROR_TS)
-          if (NOT COMPILER_RT_DEFAULT_TARGET_ARCH MATCHES "patmos")
-            message(WARNING "llvm-config finding testingsupport failed with status ${HAD_ERROR_TS}")
-          endif()
-        elseif(COMPILER_RT_INCLUDE_TESTS)
-          string(REGEX REPLACE "[ \t]*[\r\n]+[ \t]*" ";" CONFIG_OUTPUT_TS ${CONFIG_OUTPUT_TS})
-          list(GET CONFIG_OUTPUT_TS 0 LDFLAGS_TS)
-          list(GET CONFIG_OUTPUT_TS 1 LIBLIST_TS)
-          if (LIBLIST_TS STREQUAL "")
-            if (NOT COMPILER_RT_DEFAULT_TARGET_ARCH MATCHES "patmos")
-              message(WARNING "testingsupport library not installed, some tests will be skipped")
-            endif()
-          else()
-            file(TO_CMAKE_PATH "${LDFLAGS_TS}" LDFLAGS_TS)
-            file(TO_CMAKE_PATH "${LIBLIST_TS}" LIBLIST_TS)
-            set(LLVM_TESTINGSUPPORT_LDFLAGS ${LDFLAGS_TS} CACHE STRING "Linker flags for LLVMTestingSupport library")
-            set(LLVM_TESTINGSUPPORT_LIBLIST ${LIBLIST_TS} CACHE STRING "Library list for LLVMTestingSupport")
-            set(COMPILER_RT_HAS_LLVMTESTINGSUPPORT TRUE)
-          endif()
-        endif()
-
-        # Make use of LLVM CMake modules if available.
-        execute_process(
-          COMMAND ${LLVM_CONFIG_PATH} --cmakedir
-          RESULT_VARIABLE HAD_ERROR_CMAKE
-          OUTPUT_VARIABLE CONFIG_OUTPUT_CMAKE
-          ERROR_QUIET)
-        if (NOT HAD_ERROR_CMAKE)
-          string(STRIP "${CONFIG_OUTPUT_CMAKE}" LLVM_CMAKE_DIR_FROM_LLVM_CONFIG)
-          file(TO_CMAKE_PATH ${LLVM_CMAKE_DIR_FROM_LLVM_CONFIG} LLVM_CMAKE_DIR)
-        else()
-          file(TO_CMAKE_PATH ${LLVM_BINARY_DIR} LLVM_BINARY_DIR_CMAKE_STYLE)
-          set(LLVM_CMAKE_DIR "${LLVM_BINARY_DIR_CMAKE_STYLE}/lib${LLVM_LIBDIR_SUFFIX}/cmake/llvm")
-        endif()
-
-        set(LLVM_CMAKE_INCLUDE_FILE "${LLVM_CMAKE_DIR}/LLVMConfig.cmake")
-        if (EXISTS "${LLVM_CMAKE_INCLUDE_FILE}" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
-          # Non-bare-metal: include LLVMConfig.cmake normally.
-          list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
-          include("${LLVM_CMAKE_INCLUDE_FILE}")
-          set(FOUND_LLVM_CMAKE_DIR TRUE)
-          set(LLVM_FOUND TRUE)
-        elseif (CMAKE_SYSTEM_NAME STREQUAL "Generic")
-        else()
-          message(WARNING "LLVM CMake path (${LLVM_CMAKE_INCLUDE_FILE}) reported by llvm-config does not exist")
-        endif()
-
-        set(LLVM_LIBRARY_OUTPUT_INTDIR
-          ${LLVM_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib${LLVM_LIBDIR_SUFFIX})
       endif()
     endif()
   endif()
+
+  set(LLVM_LIBRARY_OUTPUT_INTDIR
+    ${LLVM_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib${LLVM_LIBDIR_SUFFIX})
 
   set(LLVM_MAIN_SRC_DIR "${LLVM_MAIN_SRC_DIR_DEFAULT}" CACHE PATH "Path to LLVM source tree")
   message(STATUS "LLVM_MAIN_SRC_DIR: \"${LLVM_MAIN_SRC_DIR}\"")
@@ -481,7 +369,7 @@ macro(load_llvm_config)
                     "This will be treated as error in the future.")
   endif()
 
-  if (NOT LLVM_FOUND AND NOT FOUND_LLVM_CMAKE_DIR)
+  if (NOT LLVM_FOUND)
     # This configuration tries to configure without the prescence of `LLVMConfig.cmake`. It is
     # intended for testing purposes (generating the lit test suites) and will likely not support
     # a build of the runtimes in compiler-rt.
@@ -513,7 +401,7 @@ macro(construct_compiler_rt_default_triple)
 
   if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     set(option_prefix "")
-    if (CMAKE_C_SIMULATE_ID MATCHES "MSVC")
+    if (CMAKE_C_COMPILER_FRONTEND_VARIANT MATCHES "MSVC")
       set(option_prefix "/clang:")
     endif()
     set(print_target_triple ${CMAKE_C_COMPILER} ${option_prefix}--target=${COMPILER_RT_DEFAULT_TARGET_TRIPLE} ${option_prefix}-print-target-triple)
@@ -540,17 +428,40 @@ macro(construct_compiler_rt_default_triple)
     set(COMPILER_RT_DEFAULT_TARGET_ARCH "i386")
   endif()
 
+  if("${COMPILER_RT_DEFAULT_TARGET_ARCH}" MATCHES "^thumb")
+    string(REPLACE "thumb" "arm" COMPILER_RT_DEFAULT_TARGET_ARCH "${COMPILER_RT_DEFAULT_TARGET_ARCH}")
+    set(COMPILER_RT_ARM_THUMB ON)
+  endif()
+
+  if("${COMPILER_RT_DEFAULT_TARGET_ARCH}" MATCHES "amdgpu|amdgcn")
+    set(COMPILER_RT_TARGET_AMDGPU TRUE)
+  else()
+    set(COMPILER_RT_TARGET_AMDGPU FALSE)
+  endif()
+
   # If we are directly targeting a GPU we need to check that the compiler is
   # compatible and pass some default arguments.
   if(COMPILER_RT_DEFAULT_TARGET_ONLY)
 
     # Pass the necessary flags to make flag detection work.
-    if("${COMPILER_RT_DEFAULT_TARGET_ARCH}" MATCHES "amdgcn")
+    if(COMPILER_RT_TARGET_AMDGPU)
       set(COMPILER_RT_GPU_BUILD ON)
-    elseif("${COMPILER_RT_DEFAULT_TARGET_ARCH}" MATCHES "nvptx")
+    elseif("${COMPILER_RT_DEFAULT_TARGET_ARCH}" MATCHES "nvptx|spirv64")
       set(COMPILER_RT_GPU_BUILD ON)
       set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -flto -c")
     endif()
+  endif()
+
+  # Try to locate the GPU loader utility for GPU unit tests.
+  if(COMPILER_RT_GPU_BUILD AND NOT COMPILER_RT_EMULATOR)
+    get_filename_component(_compiler_path "${CMAKE_C_COMPILER}" DIRECTORY)
+    find_program(COMPILER_RT_EMULATOR
+                 NAMES llvm-gpu-loader NO_DEFAULT_PATH
+                 PATHS ${LLVM_BINARY_DIR}/bin ${_compiler_path})
+    if(COMPILER_RT_EMULATOR)
+      message(STATUS "Found GPU loader for testing: ${COMPILER_RT_EMULATOR}")
+    endif()
+    unset(_compiler_path)
   endif()
 
   # Determine if test target triple is specified explicitly, and doesn't match the
@@ -579,69 +490,31 @@ function(filter_builtin_sources inout_var name)
       # and ensure that it is removed from the file list.
       get_filename_component(_name ${_file} NAME)
       string(REGEX REPLACE "\\.S$" ".c" _cname "${_name}")
-      if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_cname}")
-        message(STATUS "For ${name} builtins preferring ${_file} to ${_cname}")
-        list(REMOVE_ITEM intermediate ${_cname})
-      endif()
+      get_property(_cnames SOURCE ${_file} PROPERTY crt_supersedes)
+      set(_cnames ${_cname} ${_cnames})
+      foreach(_cname ${_cnames})
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_cname}")
+          message(STATUS "For ${name} builtins preferring ${_file} to ${_cname}")
+          list(REMOVE_ITEM intermediate ${_cname})
+        endif()
+      endforeach()
     endif()
   endforeach()
   set(${inout_var} ${intermediate} PARENT_SCOPE)
 endfunction()
 
 function(get_compiler_rt_target arch variable)
-  string(FIND ${COMPILER_RT_DEFAULT_TARGET_TRIPLE} "-" dash_index)
-  string(SUBSTRING ${COMPILER_RT_DEFAULT_TARGET_TRIPLE} ${dash_index} -1 triple_suffix)
-  string(SUBSTRING ${COMPILER_RT_DEFAULT_TARGET_TRIPLE} 0 ${dash_index} triple_cpu)
   if(COMPILER_RT_DEFAULT_TARGET_ONLY)
     # Use exact spelling when building only for the target specified to CMake.
     set(target "${COMPILER_RT_DEFAULT_TARGET_TRIPLE}")
-  elseif(ANDROID AND ${arch} STREQUAL "i386")
-    set(target "i686${triple_suffix}")
-  elseif(${arch} STREQUAL "amd64")
-    set(target "x86_64${triple_suffix}")
-  elseif(${arch} STREQUAL "sparc64")
-    set(target "sparcv9${triple_suffix}")
-  elseif("${arch}" MATCHES "mips64|mips64el")
-    string(REGEX REPLACE "-gnu.*" "-gnuabi64" triple_suffix_gnu "${triple_suffix}")
-    string(REGEX REPLACE "mipsisa32" "mipsisa64" triple_cpu_mips "${triple_cpu}")
-    string(REGEX REPLACE "^mips$" "mips64" triple_cpu_mips "${triple_cpu_mips}")
-    string(REGEX REPLACE "^mipsel$" "mips64el" triple_cpu_mips "${triple_cpu_mips}")
-    set(target "${triple_cpu_mips}${triple_suffix_gnu}")
-  elseif("${arch}" MATCHES "mips|mipsel")
-    string(REGEX REPLACE "-gnuabi.*" "-gnu" triple_suffix_gnu "${triple_suffix}")
-    string(REGEX REPLACE "mipsisa64" "mipsisa32" triple_cpu_mips "${triple_cpu}")
-    string(REGEX REPLACE "mips64" "mips" triple_cpu_mips "${triple_cpu_mips}")
-    set(target "${triple_cpu_mips}${triple_suffix_gnu}")
-  elseif("${arch}" MATCHES "^arm")
-    # Arch is arm, armhf, armv6m (anything else would come from using
-    # COMPILER_RT_DEFAULT_TARGET_ONLY, which is checked above).
-    if (${arch} STREQUAL "armhf")
-      # If we are building for hard float but our ABI is soft float.
-      if ("${triple_suffix}" MATCHES ".*eabi$")
-        # Change "eabi" -> "eabihf"
-        set(triple_suffix "${triple_suffix}hf")
-      endif()
-      # ABI is already set in the triple, don't repeat it in the architecture.
-      set(arch "arm")
-    else ()
-      # If we are building for soft float, but the triple's ABI is hard float.
-      if ("${triple_suffix}" MATCHES ".*eabihf$")
-        # Change "eabihf" -> "eabi"
-        string(REGEX REPLACE "hf$" "" triple_suffix "${triple_suffix}")
-      endif()
-    endif()
-    set(target "${arch}${triple_suffix}")
-  elseif("${arch}" MATCHES "^amdgcn")
-    set(target "amdgcn-amd-amdhsa")
-  elseif("${arch}" MATCHES "^nvptx")
-    set(target "nvptx64-nvidia-cuda")
   else()
-    set(target "${arch}${triple_suffix}")
+    get_runtimes_target_libdir_common("${COMPILER_RT_DEFAULT_TARGET_TRIPLE}" "${arch}" target)
   endif()
-  set(${variable} ${target} PARENT_SCOPE)
+  set(${variable} "${target}" PARENT_SCOPE)
 endfunction()
 
 function(get_compiler_rt_install_dir arch install_dir)
+  # TODO: Use RUNTIMES_INSTALL_RESOURCE_LIB_PATH instead
   if(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR AND NOT APPLE)
     get_compiler_rt_target(${arch} target)
     set(${install_dir} ${COMPILER_RT_INSTALL_LIBRARY_DIR}/${target} PARENT_SCOPE)
@@ -651,6 +524,7 @@ function(get_compiler_rt_install_dir arch install_dir)
 endfunction()
 
 function(get_compiler_rt_output_dir arch output_dir)
+  # TODO: Use RUNTIMES_OUTPUT_RESOURCE_LIB_DIR instead
   if(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR AND NOT APPLE)
     get_compiler_rt_target(${arch} target)
     set(${output_dir} ${COMPILER_RT_OUTPUT_LIBRARY_DIR}/${target} PARENT_SCOPE)
