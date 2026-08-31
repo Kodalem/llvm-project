@@ -2169,12 +2169,21 @@ void LinkerDriver::loadFiles() {
         bool lazy = !job.inWholeArchive;
         for (const auto &[mb, offset] : members) {
           auto mm = identify_magic(mb.getBuffer());
+          // Note: For future people reading this...
+          // this is an hamfisted way to fix the following issue by
+          // squelching it when using the Patmos's Rust fork, if this
+          // becomes an issue, then do not include this commit or
+          // un-cherry-pick this commit and/or following changes if
+          // merge conflict arises from this.
+          StringRef name = mb.getBufferIdentifier();
+          // Don't warn about Rust's metadata files in rlib archives
+          bool isRustMetadata =
+              name.ends_with("lib.rmeta") || name.ends_with("lib.rmeta-link");
           if (mm == file_magic::elf_relocatable || mm == file_magic::bitcode ||
-              job.inWholeArchive)
+              job.inWholeArchive || isRustMetadata)
             job.out.push_back(makeFile(mb, mm, job.path, offset, lazy));
           else
-            Warn(ctx) << job.path << ": archive member '"
-                      << mb.getBufferIdentifier()
+            Warn(ctx) << job.path << ": archive member '" << name
                       << "' is neither ET_REL nor LLVM bitcode";
         }
         break;
@@ -3529,10 +3538,12 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   if (!ctx.arg.relocatable)
     ctx.inputSections.push_back(createCommentSection(ctx));
 
-  // Split SHF_MERGE and .eh_frame sections into pieces in preparation for garbage collection.
+  // Split SHF_MERGE and .eh_frame sections into pieces in preparation for
+  // garbage collection.
   splitSections<ELFT>(ctx);
 
-  // Garbage collection and removal of shared symbols from unused shared objects.
+  // Garbage collection and removal of shared symbols from unused shared
+  // objects.
   markLive<ELFT>(ctx);
 
   if (canHaveMemtagGlobals(ctx)) {
@@ -3584,7 +3595,8 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &args) {
   }
 
   // Two input sections with different output sections should not be folded.
-  // ICF runs after processSectionCommands() so that we know the output sections.
+  // ICF runs after processSectionCommands() so that we know the output
+  // sections.
   if (ctx.arg.icf != ICFLevel::None) {
     findKeepUniqueSections<ELFT>(ctx, args);
     doIcf<ELFT>(ctx);
