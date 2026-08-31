@@ -173,7 +173,7 @@ jobs:
           - platform: ubuntu-latest
             cc: gcc
             cxx: g++
-          - platform: ubuntu-22.04
+          - platform: ubuntu-24.04
             cc: gcc
             cxx: g++
           - platform: macos-latest # ARM
