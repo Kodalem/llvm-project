@@ -1,16 +1,15 @@
+; RUN: llc %s -mpatmos-subfunction-align=32 -mpatmos-max-subfunction-size=64 -filetype=obj -o %t_lit_cfg_compiled && llc %S/../../_start.ll -filetype=obj -o %t_lit_cfg_start && ld.lld --nostdlib --static -o %t %t_lit_cfg_start %t_lit_cfg_compiled && pasim %t -c 800 --mcsize=64
 ; RUN: llc < %s -mpatmos-subfunction-align=32 -mpatmos-max-subfunction-size=64| FileCheck %s
 ; RUN: llc < %s -mpatmos-subfunction-align=32 -mpatmos-max-subfunction-size=64 -filetype=obj -o %t;\
 ; RUN: ld.lld %t --nostdlib --static -o %t --section-start .text=1 --image-base=0;\
 ; RUN: llvm-objdump %t -d| FileCheck %s --check-prefix ALIGN
-; RUN: LLC_ARGS="-mpatmos-subfunction-align=32 -mpatmos-max-subfunction-size=64";\
-; RUN: PASIM_ARGS="--mcsize=64"; %test_no_runtime_execution
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 
 ; CHECK: .p2align 5
-; CHECK: .fstart	main, .PPGtmp{{[0-9]}}-main, 32
+; CHECK: .fstart	main, .Ltmp{{[0-9]}}-main, 32
 ; CHECK-NEXT: main:
 
 ; ALIGN: {{[0-9]*[0|2|4|6|8|a|c|e]4}} <main>:
@@ -29,7 +28,7 @@ entry:
 	()
 	
 ; CHECK: .p2align 5
-; CHECK: .fstart	[[INLINE1:.LBB0_[0-9]]], .PPGtmp{{[0-9]}}-[[INLINE1]], 32
+; CHECK: .fstart	[[INLINE1:.LBB0_[0-9]]], .Ltmp{{[0-9]}}-[[INLINE1]], 32
 ; CHECK-LABEL: .inline_1:
 
 ; ALIGN: {{[0-9]*[0|2|4|6|8|a|c|e]4}} <.inline_1>:
@@ -44,7 +43,7 @@ entry:
 	(i32 %0)
 
 ; CHECK: .p2align 5
-; CHECK: .fstart	[[INLINE2:.LBB0_[0-9]]], .PPGtmp{{[0-9]}}-[[INLINE2]], 32
+; CHECK: .fstart	[[INLINE2:.LBB0_[0-9]]], .Ltmp{{[0-9]}}-[[INLINE2]], 32
 ; CHECK-LABEL: .inline_2:
 
 ; ALIGN: {{[0-9]*[0|2|4|6|8|a|c|e]4}} <.inline_2>:
@@ -64,7 +63,7 @@ entry:
 	(i32 %1)
 
 ; CHECK: .p2align 5
-; CHECK: .fstart	[[INLINE3:.LBB0_[0-9]]], .PPGtmp{{[0-9]}}-[[INLINE3]], 32	
+; CHECK: .fstart	[[INLINE3:.LBB0_[0-9]]], .Ltmp{{[0-9]}}-[[INLINE3]], 32
 ; CHECK-LABEL: .inline_3:
 
 ; ALIGN: {{[0-9]*[0|2|4|6|8|a|c|e]4}} <.inline_3>:

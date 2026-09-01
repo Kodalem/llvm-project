@@ -1,9 +1,9 @@
-; RUN: SUCCESS=true; \
-; RUN: for n in {3..8}; do \
-; RUN:  echo "n=$n"; \
-; RUN:   sed "s/BASE_N/$n/g" %s > %t && opt -O2 %t -o - | llc | FileCheck %t \
-; RUN:     && echo "  success" || SUCCESS=false; \
-; RUN: done; $SUCCESS
+; RUN: sed "s/BASE_N/3/g" %s > %t && opt -O2 %t -o - | llc | FileCheck %t
+; RUN: sed "s/BASE_N/4/g" %s > %t && opt -O2 %t -o - | llc | FileCheck %t
+; RUN: sed "s/BASE_N/5/g" %s > %t && opt -O2 %t -o - | llc | FileCheck %t
+; RUN: sed "s/BASE_N/6/g" %s > %t && opt -O2 %t -o - | llc | FileCheck %t
+; RUN: sed "s/BASE_N/7/g" %s > %t && opt -O2 %t -o - | llc | FileCheck %t
+; RUN: sed "s/BASE_N/8/g" %s > %t && opt -O2 %t -o - | llc | FileCheck %t
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ;
@@ -18,7 +18,7 @@
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 
 ; CHECK-LABEL: main:
-define i32 @main(i32 %value)  {
+define i32 @main(i32 %value)  {  ; <label>:%entry
 entry:
   br label %loop
   

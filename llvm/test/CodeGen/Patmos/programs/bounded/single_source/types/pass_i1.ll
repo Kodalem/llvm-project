@@ -1,5 +1,5 @@
-; RUN: EXEC_ARGS="0=33 1=22 2=33 3=22"; \
-; RUN: %test_execution
+; RUN: %test_execution_main 0=33 1=22 2=33 3=22
+; RUN: %test_execution_indirect 0=33 1=22 2=33 3=22
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ;
 ; Tests the ability to pass an i1 as an argument.

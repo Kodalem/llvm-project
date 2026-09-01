@@ -1,5 +1,5 @@
-; RUN: EXEC_ARGS="0=2 1=4"; \
-; RUN: %test_execution
+; RUN: %test_execution_main 0=2 1=4
+; RUN: %test_execution_indirect 0=2 1=4
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ; 

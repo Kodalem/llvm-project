@@ -1,4 +1,4 @@
-; RUN: llc < %s %XFAIL-filecheck %s
+; RUN: llc %s %XFAIL-filecheck %s
 ; END.
 ; Test that cannot provide clobbers preceded by '$'
 ;

@@ -1,9 +1,7 @@
-; RUN: EXEC_ARGS="0=0 1=52 2=104 4=208" 
-; RUN: MEMSET_COUNT="52"
-; RUN: MEMSET_ALLOC_COUNT="53"
-; RUN: MEMSET_PTR_INC="1" 
-; RUN: %memset_check_i32 %test_execution
-; RUN: %memset_check_i64 %test_execution
+; RUN: env MEMSET_COUNT=52 MEMSET_ALLOC_COUNT=53 MEMSET_PTR_INC=1 %memset_check_i32_main 0=0 1=52 2=104 4=208
+; RUN: env MEMSET_COUNT=52 MEMSET_ALLOC_COUNT=53 MEMSET_PTR_INC=1 %memset_check_i32_indirect 0=0 1=52 2=104 4=208
+; RUN: env MEMSET_COUNT=52 MEMSET_ALLOC_COUNT=53 MEMSET_PTR_INC=1 %memset_check_i64_main 0=0 1=52 2=104 4=208
+; RUN: env MEMSET_COUNT=52 MEMSET_ALLOC_COUNT=53 MEMSET_PTR_INC=1 %memset_check_i64_indirect 0=0 1=52 2=104 4=208
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ;

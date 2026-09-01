@@ -8,10 +8,18 @@ These tests ensure the `llvm.memset` will be converted to inline code and not ne
 You must use both, to ensure that both the `i32` and `i64` versions of `llvm.memset` are tested.
 The following variables must be set before calling the tests:
 
-* `MEMSET_COUNT`: The length argument to `llvm.memset`
-* `MEMSET_ALLOC_COUNT`: How much space (in bytes) the test should allocate. This may be larger than `MEMSET_COUNT`.
-* `MEMSET_PTR_INC`: By how many bytes to increment the destination pointer before passing it to `llvm.memset`. 
-	The destination pointer by default is 4-aligned. 
-	This allows you to change that alignment by increment. 
-	If no increment is needed, use `0`.
-* `MEMSET_PTR_ATTR`: Attributes to add to the destination pointer when passed to `llvm.memset`. Optional.
+- `MEMSET_COUNT`: The length argument to `llvm.memset`
+- `MEMSET_ALLOC_COUNT`: How much space (in bytes) the test should allocate. This may be larger than `MEMSET_COUNT`.
+- `MEMSET_PTR_INC`: By how many bytes to increment the destination pointer before passing it to `llvm.memset`.
+  The destination pointer by default is 4-aligned.
+  This allows you to change that alignment by increment.
+  If no increment is needed, use `0`.
+- `MEMSET_PTR_ATTR`: Attributes to add to the destination pointer when passed to `llvm.memset`. Optional.
+
+Added the `xxx_smoke.ll` test, because the `xxx.ll` tests are too large to run in a reasonable time, and the `xxx_smoke.ll` tests are enough to ensure that the `llvm.memcpy` is converted to inline code. This is sufficient enough for personal runs, but in the CI/CD it **must** run the full `xxx.ll` tests to ensure that the inline code is correct for all cases.
+
+To run expensive non-smoke tests, use the `RUN_EXPENSIVE_TESTS` environmental variable set to `true` i.e.
+
+```zsh
+PATMOS_RUN_EXPENSIVE_TESTS=1 ./bin/llvm-lit ../llvm/test/CodeGen/Patmos -j12
+```

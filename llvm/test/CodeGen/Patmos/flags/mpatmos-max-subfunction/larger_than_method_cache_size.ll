@@ -1,10 +1,9 @@
 ;      # We reuse the main method by compiling it manually
-; RUN: llc %S/matches_method_cache_size.ll -filetype=obj -o %t -mpatmos-max-subfunction-size=64
-;      # We then have the ld link it with the rest
-; RUN: LD_ARGS="%t"; \ 
-;      # We execute with a method cache size smaller than the subfunction size specified before
-; RUN: PASIM_ARGS="--mcsize=32"; \ 
-; RUN: %test_no_runtime_execution %XFAIL-filecheck %s
+; RUN: llc %S/matches_method_cache_size.ll -filetype=obj -o %t_match -mpatmos-max-subfunction-size=64
+;      # Compile this test and startup code, then link all objects.
+; RUN: llc %s -filetype=obj -o %t_prog && llc %S/../../_start.ll -filetype=obj -o %t_start && ld.lld --nostdlib --static -o %t_exec %t_start %t_prog %t_match
+;      # Execute with a smaller method cache; this should fail.
+; RUN: pasim %t_exec -c 800 --mcsize=32 %XFAIL-filecheck %s
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ;

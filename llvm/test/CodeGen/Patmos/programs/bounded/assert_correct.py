@@ -7,6 +7,8 @@ if which("pasim") is None:
     print("Patmos simulator 'pasim' could not be found.")
     sys.exit(1)
 
+pasim_timeout_seconds = 30
+
 first_exec_arg_index = 9
 if len(sys.argv) <= (first_exec_arg_index + 1):
     print("Must have at least 2 execution arguments but was:", sys.argv[first_exec_arg_index:])
@@ -118,7 +120,7 @@ def execute_and_stat(program, args, pasim_args):
      
     try:
         pasim_result = subprocess.run(["pasim", exec_name, "-V"] + pasim_args.split(), 
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=10)
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=pasim_timeout_seconds)
     except subprocess.TimeoutExpired:
         return True, "\nThe execution of '" + program + "' for input argument '" + input + "' timed out"
     

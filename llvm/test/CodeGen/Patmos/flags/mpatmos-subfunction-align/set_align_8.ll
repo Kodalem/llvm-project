@@ -1,8 +1,8 @@
+; RUN: llc %s -mpatmos-subfunction-align=8 -filetype=obj -o %t_lit_cfg_compiled && llc %S/../../_start.ll -filetype=obj -o %t_lit_cfg_start && ld.lld --nostdlib --static -o %t %t_lit_cfg_start %t_lit_cfg_compiled && pasim %t -c 800
 ; RUN: llc < %s -mpatmos-subfunction-align=8 | FileCheck %s
 ; RUN: llc < %s -mpatmos-subfunction-align=8 -filetype=obj -o %t;\
 ; RUN: ld.lld %t --nostdlib --static -o %t --section-start .text=1 --image-base=0;\
 ; RUN: llvm-objdump %t -d | FileCheck %s --check-prefix ALIGN
-; RUN: LLC_ARGS="-mpatmos-subfunction-align=8"; %test_no_runtime_execution
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ;
@@ -27,7 +27,7 @@
 @_7 = global i32 7
 
 ; CHECK: .p2align 3
-; CHECK: .fstart	main, .PPGtmp{{[0-9]}}-main, 8
+; CHECK: .fstart	main, .Ltmp{{[0-9]}}-main, 8
 ; CHECK-NEXT: main:
 
 ; ALIGN: {{[0-9]*[4|c]}} <main>:

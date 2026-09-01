@@ -1,6 +1,4 @@
-; RUN: LLC_ARGS="-mpatmos-max-subfunction-size=64"; \
-; RUN: PASIM_ARGS="--mcsize=64"; \ 
-; RUN: %test_no_runtime_execution
+; RUN: llc %s -mpatmos-max-subfunction-size=64 -filetype=obj -o %t_lit_cfg_compiled && llc %S/../../_start.ll -filetype=obj -o %t_lit_cfg_start && ld.lld --nostdlib --static -o %t %t_lit_cfg_start %t_lit_cfg_compiled && pasim %t -c 800 --mcsize=64
 ; RUN: llc < %s -mpatmos-max-subfunction-size=64 | FileCheck %s
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////

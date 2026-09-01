@@ -1,5 +1,9 @@
-; RUN: EXEC_ARGS="0=5 1=10 2=15 3=20 4=25"; \
-; RUN: %test_execution
+; REQUIRES: patmos-expensive-tests
+; This is the stress version. The default suite runs
+; nested_loop_const_var_smoke.ll with the same constant/variable nested-loop
+; shape and fewer inputs; enable patmos-expensive-tests for the full input coverage.
+; RUN: %test_execution_main 0=5 1=10 2=15 3=20 4=25
+; RUN: %test_execution_indirect 0=5 1=10 2=15 3=20 4=25
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ; 

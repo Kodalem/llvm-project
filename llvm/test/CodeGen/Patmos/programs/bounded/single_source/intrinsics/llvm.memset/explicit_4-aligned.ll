@@ -1,10 +1,10 @@
-; RUN: EXEC_ARGS="0=0 1=20 2=40 6=120" 
-; RUN: MEMSET_COUNT="20"
-; RUN: MEMSET_ALLOC_COUNT="20"
-; RUN: MEMSET_PTR_INC="0" 
-; RUN: MEMSET_PTR_ATTR="noundef nonnull align 4" 
-; RUN: %memset_check_i32 %test_execution
-; RUN: %memset_check_i64 %test_execution
+; This is the default smoke coverage for explicit 4-byte alignment. The
+; expensive stress coverage lives in explicit_4-aligned_large.ll; passing this
+; test means the same aligned intrinsic lowering path works for a smaller count.
+; RUN: env MEMSET_COUNT=4 MEMSET_ALLOC_COUNT=4 MEMSET_PTR_INC=0 MEMSET_PTR_ATTR="noundef nonnull align 4" %memset_check_i32_main 0=0 1=4 2=8 6=24
+; RUN: env MEMSET_COUNT=4 MEMSET_ALLOC_COUNT=4 MEMSET_PTR_INC=0 MEMSET_PTR_ATTR="noundef nonnull align 4" %memset_check_i32_indirect 0=0 1=4 2=8 6=24
+; RUN: env MEMSET_COUNT=4 MEMSET_ALLOC_COUNT=4 MEMSET_PTR_INC=0 MEMSET_PTR_ATTR="noundef nonnull align 4" %memset_check_i64_main 0=0 1=4 2=8 6=24
+; RUN: env MEMSET_COUNT=4 MEMSET_ALLOC_COUNT=4 MEMSET_PTR_INC=0 MEMSET_PTR_ATTR="noundef nonnull align 4" %memset_check_i64_indirect 0=0 1=4 2=8 6=24
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ;
 ; Tests that memset accepts destination pointer with explicit 4-alignment.

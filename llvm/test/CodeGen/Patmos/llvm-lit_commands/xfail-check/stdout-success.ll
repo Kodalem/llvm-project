@@ -1,4 +1,4 @@
-; RUN: CHECK_STDOUT=true; ( echo "some specific stdout output" ; false ) %XFAIL-filecheck %s
+; RUN: sh -c 'echo "some specific stdout output"; false' %XFAIL-filecheck %s
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ;

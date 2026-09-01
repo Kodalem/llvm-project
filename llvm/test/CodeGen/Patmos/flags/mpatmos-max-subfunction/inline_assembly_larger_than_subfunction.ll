@@ -1,4 +1,4 @@
-; RUN: llc < %s -mpatmos-max-subfunction-size=64 %XFAIL-filecheck %s
+; RUN: llc %s -mpatmos-max-subfunction-size=64 %XFAIL-filecheck %s
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ;

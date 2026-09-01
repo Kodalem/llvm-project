@@ -17,10 +17,10 @@ It compiles three different versions of each program:
 1. Compiled using single-path code with VLIW disabled.
 
 For the last two versions, it also ensures that valid single-path code is generated.
-It does so by using `pasim` to get statistics on the execution of the program on different input. 
-It then checks the statistics are identical across executions, which is the fundamental characteristic of single-path. 
+It does so by using `pasim` to get statistics on the execution of the program on different input.
+It then checks the statistics are identical across executions, which is the fundamental characteristic of single-path.
 
-The command is intended to be used in `llvm-lit` tests, and be called as part of the `; RUN:` command in the tests. 
+The command is intended to be used in `llvm-lit` tests, and be called as part of the `; RUN:` command in the tests.
 E.g. `; EXEC_ARGS="0=0 1=1 2=2" ; %test_execution`.
 
 The `EXEC_ARGS` variable must be use to give at least two _execution arguments_.
@@ -31,3 +31,12 @@ The second number must be between 0 and 256 and is the expected output of the te
 If LLC's `--debug` output is needed, the `WITH_DEBUG` variable can be set to `true`.
 This will make the tests produce debug output in a `.debug` file in the build folder (alongside where the compiled test programs are put).
 See the error output of a test (which has this variable set) to see exactly where the file is.
+
+Some tests have a default `*_smoke.ll` version and a larger stress version guarded by `REQUIRES: patmos-expensive-tests`. The smoke version keeps the same control-flow or intrinsic-lowering shape with smaller bounds or fewer inputs so the normal suite catches regressions quickly. In
+the CI/CD, the full version should be ran instead to ensure correctness of the generated code.
+
+To run expensive non-smoke tests, use the `RUN_EXPENSIVE_TESTS` environmental variable set to `true` i.e.
+
+```zsh
+PATMOS_RUN_EXPENSIVE_TESTS=1 ./bin/llvm-lit ../llvm/test/CodeGen/Patmos -j12
+```

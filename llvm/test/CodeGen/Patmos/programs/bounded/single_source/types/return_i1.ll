@@ -1,5 +1,5 @@
-; RUN: EXEC_ARGS="0=0 1=1 2=0 3=1 11=1 100=0"; \
-; RUN: %test_execution
+; RUN: %test_execution_main 0=0 1=1 2=0 3=1 11=1 100=0
+; RUN: %test_execution_indirect 0=0 1=1 2=0 3=1 11=1 100=0
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ;
 ; Tests the ability to return an i1. Known to not work.

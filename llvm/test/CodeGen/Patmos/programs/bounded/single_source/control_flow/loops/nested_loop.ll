@@ -1,5 +1,9 @@
-; RUN: EXEC_ARGS="0=0 1=0 8=1 9=2 10=3 17=4 18=6 19=8 27=12 45=30"; \
-; RUN: %test_execution
+; REQUIRES: patmos-expensive-tests
+; This is the stress version. The default suite runs nested_loop_smoke.ll with
+; the same nested-loop shape and a smaller input set; enable expensive_checks
+; for the full input coverage.
+; RUN: %test_execution_main 0=0 1=0 8=1 9=2 10=3 17=4 18=6 19=8 27=12 45=30
+; RUN: %test_execution_indirect 0=0 1=0 8=1 9=2 10=3 17=4 18=6 19=8 27=12 45=30
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ; 

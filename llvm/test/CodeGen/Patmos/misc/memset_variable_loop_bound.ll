@@ -44,5 +44,3 @@ entry:
 }
 
 declare void @llvm.memset.p0i8.i32(i8*, i8, i32, i1)
-
-

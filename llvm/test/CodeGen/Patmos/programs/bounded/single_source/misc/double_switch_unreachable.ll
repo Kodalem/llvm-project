@@ -1,5 +1,5 @@
-; RUN: EXEC_ARGS="0=10 1=1 2=12 4=14"; \
-; RUN: %test_execution
+; RUN: %test_execution_main 0=10 1=1 2=12 4=14
+; RUN: %test_execution_indirect 0=10 1=1 2=12 4=14
 ; END. 
 
 ; Helper for adding to double

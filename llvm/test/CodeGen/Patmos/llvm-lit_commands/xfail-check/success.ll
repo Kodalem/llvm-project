@@ -1,4 +1,4 @@
-; RUN: ( echo "some specific stderr output" 1>&2 ; false ) %XFAIL-filecheck %s
+; RUN: sh -c 'echo "some specific stderr output" 1>&2; false' %XFAIL-filecheck %s
 ; END.
 ;//////////////////////////////////////////////////////////////////////////////////////////////////
 ;

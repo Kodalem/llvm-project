@@ -149,6 +149,10 @@ To test LLVM:
 ```
 make -j llc UnitTests && ./bin/llvm-lit ../llvm/test -v --filter=Patmos
 ```
+By default when running within your machine, it runs the truncated smoke-tests of 
+computationally heavy tests. If you want to run heavy tests, then add the 
+`PATMOS_RUN_EXPENSIVE_TESTS=1` environment variable.
+
 
 To test Clang:
 
