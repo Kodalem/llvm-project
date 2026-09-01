@@ -116,13 +116,16 @@ cmake ../llvm -DCMAKE_BUILD_TYPE=Debug -DLLVM_TARGETS_TO_BUILD="Patmos" -DLLVM_D
 make -j
 ```
 
-If you need to work on Compiler-RT, you can do the following (from the root folder):
+If you need to work on Compiler-RT, you can do the following (from the repo root):
 
-```
+```zsh
 mkdir -p build-compiler-rt
-cd build-compiler-rt
-cmake ../compiler-rt/ -DCMAKE_TOOLCHAIN_FILE=../compiler-rt/cmake/patmos-clang-toolchain.cmake -DCMAKE_PROGRAM_PATH="$(pwd)/../build/bin" -DCOMPILER_RT_INCLUDE_TESTS=ON
-make -j
+cmake -S compiler-rt -B build-compiler-rt \
+  -DCMAKE_TOOLCHAIN_FILE=compiler-rt/cmake/patmos-clang-toolchain.cmake \
+  -DCMAKE_PROGRAM_PATH="../build/bin" \
+  -DLLVM_CMAKE_DIR="../build/lib/cmake/llvm" \
+  -DCOMPILER_RT_INCLUDE_TESTS=ON
+cmake --build build-compiler-rt -j
 ```
 
 YOU CANNOT SKIP BUILDING COMPILER-RT BECAUSE OTHERWISE THE TWO .O files WILL BE MISSING!!!
@@ -149,10 +152,6 @@ To test LLVM:
 ```
 make -j llc UnitTests && ./bin/llvm-lit ../llvm/test -v --filter=Patmos
 ```
-By default when running within your machine, it runs the truncated smoke-tests of 
-computationally heavy tests. If you want to run heavy tests, then add the 
-`PATMOS_RUN_EXPENSIVE_TESTS=1` environment variable.
-
 
 To test Clang:
 
