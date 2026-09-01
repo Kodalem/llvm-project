@@ -1,50 +1,50 @@
-// RUN: INPUT=100; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=100
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN1XX,IN100"
-// RUN: INPUT=101; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=101
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN1XX,IN101"
 
-// RUN: INPUT=300; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=300
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN3XX,IN300"
-// RUN: INPUT=301; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=301
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN3XX,IN301"
-// RUN: INPUT=302; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=302
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN3XX,IN302"
-// RUN: INPUT=303; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=303
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN3XX,IN303"
 
-// RUN: INPUT=400; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=400
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN4XX,IN400"
-// RUN: INPUT=401; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=401
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN4XX,IN401"
-// RUN: INPUT=402; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=402
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN4XX,IN402"
-// RUN: INPUT=403; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=403
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN4XX,IN403"
-// RUN: INPUT=404; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=404
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN4XX,IN404"
 
-// RUN: INPUT=500; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=500
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN5XX,IN500"
-// RUN: INPUT=501; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=501
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN5XX,IN501"
-// RUN: INPUT=502; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=502
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN5XX,IN502"
-// RUN: INPUT=505; \
-// RUN: %test-patmos-input-librt --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
+// RUN: %build-patmos-input-librt --defsym input=505
+// RUN: %exec-patmos --print-stats __patmos_main_mem_access_compensation1 2>&1 | \
 // RUN: FileCheck %s --check-prefixes "CHECK,IN5XX,IN505"
 // END.
 
@@ -66,6 +66,8 @@ extern void __patmos_main_mem_access_compensation1();
 
 // Ensure the correct number of accesses go to main memory
 // 1 accesses always comes from the call itself (load instructions)
+// Unf---ing these files took a fucking while - regex didn't work, control-shift-F was okayish, luckily watched some
+// Jet Lag the Game Layover podcast to stay sane fr fr 
 
 // IN100: Requests : 1
 // IN101: Requests : 2
