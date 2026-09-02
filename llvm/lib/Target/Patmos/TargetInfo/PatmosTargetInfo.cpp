@@ -9,7 +9,6 @@
 
 #include "Patmos.h"
 #include "PatmosTargetInfo.h"
-#include "PatmosRegisterInfo.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Metadata.h"
@@ -17,6 +16,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/CodeGen/MachineFunction.h"
+#include <algorithm>
 #include <optional> // https://llvm.org/docs/CodingStandards.html
 #include "llvm/CodeGen/MachineModuleInfo.h"
 
